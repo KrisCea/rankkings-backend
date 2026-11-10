@@ -1,0 +1,219 @@
+openapi: 3.1.0
+info:
+  title: RankKings Library Service API
+  version: 1.0.0
+  description: >-
+    Gestión de obras guardadas. El gateway reenvía GET /users/me/saved y
+    PUT/DELETE /items/{itemId}/save a este servicio antes de las rutas comodín
+    de identidad y catálogo. X-User-Id debe ser inyectado por el gateway, nunca
+    confiado desde una solicitud pública.
+servers:
+  - url: http://localhost:8080/api
+    description: API Gateway local
+tags:
+  - name: Library
+paths:
+  /users/me/saved:
+    get:
+      tags: [Library]
+      operationId: getSavedItems
+      summary: Listar las obras guardadas por el usuario actual
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Elementos guardados, del más reciente al más antiguo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SavedItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /items/{itemId}/save:
+    put:
+      tags: [Library]
+      operationId: saveItem
+      summary: Guardar una obra en la biblioteca
+      description: >-
+        Idempotente. Devuelve la obra actualizada con savedByCurrentUser=true
+        y savesCount actualizado.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "200":
+          description: Obra guardada o ya guardada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankableItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags: [Library]
+      operationId: unsaveItem
+      summary: Quitar una obra de la biblioteca
+      description: >-
+        Idempotente. Devuelve la obra actualizada con savedByCurrentUser=false
+        y savesCount actualizado.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "200":
+          description: Obra quitada o ya ausente de la biblioteca.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankableItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: rk_token
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Alternativa para herramientas no navegador, si está habilitada.
+  parameters:
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    Unauthorized:
+      description: Sesión ausente, inválida o expirada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Obra no encontrada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServerError:
+      description: Error inesperado del servidor.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    SavedItem:
+      type: object
+      additionalProperties: false
+      required: [item, savedAt]
+      properties:
+        item:
+          $ref: "#/components/schemas/RankableItem"
+        savedAt:
+          type: string
+          format: date-time
+    RankableItem:
+      type: object
+      additionalProperties: true
+      description: >-
+        Misma representación que la respuesta del catálogo. Como mínimo debe
+        incluir id, category, title, creator, uploadedBy, coverUrl, identifiers,
+        verificationStatus, postId, averageRating, ratingsCount, childrenCount,
+        savedByCurrentUser, savesCount, externalLinks y createdAt.
+      required:
+        - id
+        - category
+        - title
+        - creator
+        - uploadedBy
+        - coverUrl
+        - identifiers
+        - verificationStatus
+        - postId
+        - averageRating
+        - ratingsCount
+        - childrenCount
+        - savedByCurrentUser
+        - savesCount
+        - externalLinks
+        - createdAt
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+          enum: [music, podcasts, books, movies, concerts, videogames, art, boardgames]
+        title:
+          type: string
+        creator:
+          type: object
+        uploadedBy:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        verificationStatus:
+          type: string
+          enum: [verified, partial, unverified]
+        postId:
+          type: string
+        averageRating:
+          type: number
+        ratingsCount:
+          type: integer
+          minimum: 0
+        childrenCount:
+          type: integer
+          minimum: 0
+        savedByCurrentUser:
+          type: boolean
+        savesCount:
+          type: integer
+          minimum: 0
+        externalLinks:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: string
+          format: date-time
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

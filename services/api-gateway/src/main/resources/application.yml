@@ -1,0 +1,85 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # SessionGatewayFilter elimina los encabezados del cliente y reinyecta
+          # X-User-Id tras validación; NO añadir RemoveRequestHeader aquí.
+          routes:
+            # Las rutas más específicas deben declararse antes que las genéricas.
+            - id: catalog-saved-items
+              uri: ${CATALOG_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/users/me/saved
+              filters:
+                - StripPrefix=1
+            - id: social-user-posts
+              uri: ${SOCIAL_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/users/*/posts
+              filters:
+                - StripPrefix=1
+            - id: identity-auth
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/auth/**
+              filters:
+                - StripPrefix=1
+            - id: identity-users
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/users/**
+              filters:
+                - StripPrefix=1
+            - id: social-item-reviews
+              uri: ${SOCIAL_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/items/*/reviews
+              filters:
+                - StripPrefix=1
+            - id: catalog-items
+              uri: ${CATALOG_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/items,/api/items/**
+              filters:
+                - StripPrefix=1
+            - id: social-posts
+              uri: ${SOCIAL_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/posts/**
+              filters:
+                - StripPrefix=1
+            - id: social-comments
+              uri: ${SOCIAL_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/comments/**
+              filters:
+                - StripPrefix=1
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: ${FRONTEND_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders:
+                  - Authorization
+                  - Content-Type
+                  - X-CSRF-TOKEN
+                  - X-Requested-With
+                allowCredentials: true
+                maxAge: 3600
+
+rankkings:
+  identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+  internal-key: ${INTERNAL_SERVICE_KEY:}
+  allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}

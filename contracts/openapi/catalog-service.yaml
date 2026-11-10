@@ -1,0 +1,250 @@
+openapi: 3.1.0
+info:
+  title: RankKings Catalog Service API
+  version: 1.0.0
+  description: >-
+    Lectura del catálogo de obras. El gateway publica estas rutas bajo /api y
+    las reenvía al catálogo. X-User-Id es un encabezado interno que solo debe
+    inyectar el gateway tras validar la sesión.
+servers:
+  - url: http://localhost:8080/api
+    description: API Gateway local
+tags:
+  - name: Items
+paths:
+  /items:
+    get:
+      tags: [Items]
+      operationId: searchItems
+      summary: Buscar obras por título o listar el catálogo
+      description: >-
+        Sin el parámetro query devuelve todas las obras ordenadas por título.
+        La búsqueda no distingue mayúsculas de minúsculas.
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: Texto que debe aparecer en el título de la obra.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Obras del catálogo que coinciden con la búsqueda.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RankableItem"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /items/{itemId}:
+    get:
+      tags: [Items]
+      operationId: getItemById
+      summary: Obtener una obra por identificador
+      description: >-
+        savedByCurrentUser refleja la sesión cuando está autenticada; para
+        visitantes debe ser false.
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "200":
+          description: Obra encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankableItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /items/{itemId}/children:
+    get:
+      tags: [Items]
+      operationId: getItemChildren
+      summary: Listar los elementos hijos de una colección
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "200":
+          description: Obras hijas en orden de colección.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RankableItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: rk_token
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Alternativa para herramientas no navegador, si está habilitada.
+  parameters:
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    NotFound:
+      description: Obra o colección no encontrada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServerError:
+      description: Error inesperado del servidor.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    CategoryId:
+      type: string
+      enum: [music, podcasts, books, movies, concerts, videogames, art, boardgames]
+    VerificationStatus:
+      type: string
+      enum: [verified, partial, unverified]
+    Creator:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        linkedUserId:
+          type: string
+        linkedUsername:
+          type: string
+    ExternalLink:
+      type: object
+      additionalProperties: false
+      required: [id, label, url, type]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        url:
+          type: string
+          format: uri
+        type:
+          type: string
+          enum: [streaming, store, social, other]
+    RankableItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - category
+        - title
+        - creator
+        - uploadedBy
+        - coverUrl
+        - identifiers
+        - verificationStatus
+        - postId
+        - averageRating
+        - ratingsCount
+        - childrenCount
+        - savedByCurrentUser
+        - savesCount
+        - externalLinks
+        - createdAt
+      properties:
+        id:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryId"
+        title:
+          type: string
+        description:
+          type: string
+        creator:
+          $ref: "#/components/schemas/Creator"
+        uploadedBy:
+          type: string
+        year:
+          type: integer
+        coverUrl:
+          type: string
+          format: uri
+        identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        verificationStatus:
+          $ref: "#/components/schemas/VerificationStatus"
+        postId:
+          type: string
+        averageRating:
+          type: number
+        ratingsCount:
+          type: integer
+          minimum: 0
+        parentId:
+          type: string
+        position:
+          type: integer
+          minimum: 0
+        childrenCount:
+          type: integer
+          minimum: 0
+        childrenAverageRating:
+          type: number
+        savedByCurrentUser:
+          type: boolean
+        savesCount:
+          type: integer
+          minimum: 0
+        externalLinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExternalLink"
+        createdAt:
+          type: string
+          format: date-time
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

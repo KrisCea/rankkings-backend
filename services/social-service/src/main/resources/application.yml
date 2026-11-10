@@ -1,0 +1,39 @@
+server:
+  address: ${SERVICE_BIND_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8083}
+spring:
+  application:
+    name: social-service
+  datasource:
+    url: ${SOCIAL_DB_URL:jdbc:h2:mem:social_db;DB_CLOSE_DELAY=-1}
+    username: ${SOCIAL_DB_USER:sa}
+    password: ${SOCIAL_DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update # desarrollo; usar migraciones en producción
+    open-in-view: false
+rankkings:
+  internal-key: ${INTERNAL_SERVICE_KEY:}
+  identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+  catalog-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${SOCIAL_DB_URL:jdbc:h2:file:./data/social_db}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate

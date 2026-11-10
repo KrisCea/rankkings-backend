@@ -18,6 +18,13 @@ public class CatalogController {
 
     private final CatalogService catalogService;
 
+    @GetMapping("/items")
+    public ResponseEntity<List<RankableItemDto>> searchItems(
+            @RequestParam(required = false) String query,
+            @RequestHeader(value = "X-User-Id", required = false) String currentUserId) {
+        return ResponseEntity.ok(catalogService.searchItems(query, currentUserId));
+    }
+
     @GetMapping("/items/{itemId}")
     public ResponseEntity<RankableItemDto> getItem(
             @PathVariable String itemId,

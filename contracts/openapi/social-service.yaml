@@ -1,0 +1,736 @@
+openapi: 3.1.0
+info:
+  title: RankKings Social Service API
+  version: 1.0.0
+  description: >-
+    Feed, publicaciones, interacciones y comentarios. El gateway reenvía también
+    /users/{username}/posts y /items/{itemId}/reviews a este servicio antes de
+    las rutas comodín de identidad y catálogo. X-User-Id es interno y solo debe
+    ser inyectado por el gateway.
+servers:
+  - url: http://localhost:8080/api
+    description: API Gateway local
+tags:
+  - name: Posts
+  - name: Comments
+paths:
+  /posts:
+    get:
+      tags: [Posts]
+      operationId: getPosts
+      summary: Obtener el feed de publicaciones
+      description: >-
+        Devuelve Post[]. La implementación actual del cliente no envía cursor,
+        página ni límite; definir paginación y actualizar el cliente antes de
+        activar scroll infinito.
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Publicaciones visibles para el feed.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags: [Posts]
+      operationId: createPost
+      summary: Publicar una obra existente o una reseña
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPostInput"
+      responses:
+        "201":
+          description: Publicación creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /posts/featured:
+    get:
+      tags: [Posts]
+      operationId: getFeaturedPosts
+      summary: Obtener publicaciones destacadas
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Publicaciones destacadas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /posts/{postId}:
+    get:
+      tags: [Posts]
+      operationId: getPostById
+      summary: Obtener una publicación por identificador
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "200":
+          description: Publicación encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /users/{username}/posts:
+    get:
+      tags: [Posts]
+      operationId: getPostsByAuthor
+      summary: Listar publicaciones por autor y tipo
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Username"
+        - name: kind
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/PostKind"
+      responses:
+        "200":
+          description: Publicaciones del perfil.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /items/{itemId}/reviews:
+    get:
+      tags: [Posts]
+      operationId: getReviewsForItem
+      summary: Listar reseñas asociadas a una obra
+      description: La respuesta son publicaciones Post cuyo kind es review.
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "200":
+          description: Reseñas de la obra.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /posts/{postId}/vote:
+    post:
+      tags: [Posts]
+      operationId: toggleVote
+      summary: Alternar el voto de la sesión actual
+      description: La operación es un toggle y no es idempotente.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "200":
+          description: Publicación con el estado de voto actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /posts/{postId}/rating:
+    put:
+      tags: [Posts]
+      operationId: ratePost
+      summary: Crear o reemplazar una nota
+      description: Una nota por usuario y publicación; score entre 1.0 y 10.0.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [score]
+              properties:
+                score:
+                  type: number
+                  minimum: 1
+                  maximum: 10
+      responses:
+        "200":
+          description: Publicación con el promedio y nota actualizados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags: [Posts]
+      operationId: unratePost
+      summary: Eliminar la nota de la sesión actual
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "200":
+          description: Publicación con promedios actualizados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /posts/{postId}/share:
+    post:
+      tags: [Posts]
+      operationId: sharePost
+      summary: Compartir una publicación con un usuario
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [recipientId]
+              properties:
+                recipientId:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Publicación compartida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /posts/{postId}/comments:
+    get:
+      tags: [Comments]
+      operationId: getComments
+      summary: Listar comentarios de una publicación
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "200":
+          description: Comentarios y respuestas (máximo un nivel de anidación).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags: [Comments]
+      operationId: addComment
+      summary: Crear un comentario o respuesta
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCommentInput"
+      responses:
+        "201":
+          description: Comentario creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /comments/{commentId}/like:
+    post:
+      tags: [Comments]
+      operationId: toggleCommentLike
+      summary: Alternar el like de un comentario
+      description: La operación es un toggle y no es idempotente.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Comentario con el estado de like actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: rk_token
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Alternativa para herramientas no navegador, si está habilitada.
+  parameters:
+    PostId:
+      name: postId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    Username:
+      name: username
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 30
+  responses:
+    BadRequest:
+      description: Solicitud inválida.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Unauthorized:
+      description: Sesión ausente, inválida o expirada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Publicación, comentario, usuario u obra no encontrada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServerError:
+      description: Error inesperado del servidor.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    CategoryId:
+      type: string
+      enum: [music, podcasts, books, movies, concerts, videogames, art, boardgames]
+    PostKind:
+      type: string
+      enum: [item, review]
+    ModerationStatus:
+      type: string
+      enum: [approved, pending, rejected]
+    UserSummary:
+      type: object
+      additionalProperties: false
+      required: [id, username, displayName, avatarUrl, accountType]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        accountType:
+          type: string
+          enum: [individual, business]
+        isVerifiedBusiness:
+          type: boolean
+    Creator:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        linkedUserId:
+          type: string
+        linkedUsername:
+          type: string
+    ExternalLink:
+      type: object
+      additionalProperties: false
+      required: [id, label, url, type]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        url:
+          type: string
+          format: uri
+        type:
+          type: string
+          enum: [streaming, store, social, other]
+    RankableItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - category
+        - title
+        - creator
+        - uploadedBy
+        - coverUrl
+        - identifiers
+        - verificationStatus
+        - postId
+        - averageRating
+        - ratingsCount
+        - childrenCount
+        - savedByCurrentUser
+        - savesCount
+        - externalLinks
+        - createdAt
+      properties:
+        id:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryId"
+        title:
+          type: string
+        description:
+          type: string
+        creator:
+          $ref: "#/components/schemas/Creator"
+        uploadedBy:
+          type: string
+        year:
+          type: integer
+        coverUrl:
+          type: string
+          format: uri
+        identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        verificationStatus:
+          type: string
+          enum: [verified, partial, unverified]
+        postId:
+          type: string
+        averageRating:
+          type: number
+        ratingsCount:
+          type: integer
+          minimum: 0
+        parentId:
+          type: string
+        position:
+          type: integer
+          minimum: 0
+        childrenCount:
+          type: integer
+          minimum: 0
+        childrenAverageRating:
+          type: number
+        savedByCurrentUser:
+          type: boolean
+        savesCount:
+          type: integer
+          minimum: 0
+        externalLinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExternalLink"
+        createdAt:
+          type: string
+          format: date-time
+    PostMedia:
+      type: object
+      additionalProperties: false
+      required: [id, url, type]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        type:
+          type: string
+          enum: [image, video]
+        thumbnailUrl:
+          type: string
+          format: uri
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+    PostReview:
+      type: object
+      additionalProperties: false
+      required: [authorScore]
+      properties:
+        authorScore:
+          type: number
+          minimum: 1
+          maximum: 10
+    Post:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - kind
+        - category
+        - author
+        - caption
+        - media
+        - rankableItem
+        - votesCount
+        - votedByCurrentUser
+        - averageRating
+        - ratingsCount
+        - commentsCount
+        - sharesCount
+        - moderationStatus
+        - createdAt
+        - isReelEligible
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/PostKind"
+        category:
+          $ref: "#/components/schemas/CategoryId"
+        author:
+          $ref: "#/components/schemas/UserSummary"
+        caption:
+          type: string
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostMedia"
+        rankableItem:
+          $ref: "#/components/schemas/RankableItem"
+        review:
+          $ref: "#/components/schemas/PostReview"
+        votesCount:
+          type: integer
+          minimum: 0
+        votedByCurrentUser:
+          type: boolean
+        averageRating:
+          type: number
+        ratingsCount:
+          type: integer
+          minimum: 0
+        currentUserRating:
+          type: number
+          minimum: 1
+          maximum: 10
+        commentsCount:
+          type: integer
+          minimum: 0
+        sharesCount:
+          type: integer
+          minimum: 0
+        moderationStatus:
+          $ref: "#/components/schemas/ModerationStatus"
+        createdAt:
+          type: string
+          format: date-time
+        isReelEligible:
+          type: boolean
+    CommentAuthor:
+      type: object
+      additionalProperties: false
+      required: [id, username, avatarUrl]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+    Comment:
+      type: object
+      additionalProperties: false
+      required: [id, postId, author, text, likesCount, likedByCurrentUser, createdAt]
+      properties:
+        id:
+          type: string
+        postId:
+          type: string
+        parentId:
+          type: string
+        replyToUsername:
+          type: string
+        author:
+          $ref: "#/components/schemas/CommentAuthor"
+        text:
+          type: string
+        likesCount:
+          type: integer
+          minimum: 0
+        likedByCurrentUser:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    NewPostInput:
+      type: object
+      additionalProperties: false
+      required: [itemId, kind, caption]
+      properties:
+        itemId:
+          type: string
+          minLength: 1
+        kind:
+          $ref: "#/components/schemas/PostKind"
+        caption:
+          type: string
+          maxLength: 2000
+        authorScore:
+          type: number
+          minimum: 1
+          maximum: 10
+          description: Obligatorio cuando kind es review.
+    NewCommentInput:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        parentId:
+          type: string
+        replyToUsername:
+          type: string
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

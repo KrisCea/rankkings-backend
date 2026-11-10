@@ -1,0 +1,45 @@
+server:
+  address: ${SERVICE_BIND_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8081}
+spring:
+  application:
+    name: identity-service
+  datasource:
+    url: ${IDENTITY_DB_URL:jdbc:h2:mem:identity_db;DB_CLOSE_DELAY=-1}
+    username: ${IDENTITY_DB_USER:sa}
+    password: ${IDENTITY_DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update # desarrollo; usar migraciones en producción
+    open-in-view: false
+rankkings:
+  internal-key: ${INTERNAL_SERVICE_KEY:}
+  cookie-secure: ${COOKIE_SECURE:false}
+  turnstile-secret: ${TURNSTILE_SECRET:}
+  dev-captcha-bypass: ${DEV_CAPTCHA_BYPASS:false}
+  dev-verification-logging: ${DEV_VERIFICATION_LOGGING:false}
+  social-url: ${SOCIAL_SERVICE_URL:http://localhost:8083}
+  resend-api-key: ${RESEND_API_KEY:}
+  email-from: ${VERIFICATION_FROM_EMAIL:}
+  verify-url: ${VERIFICATION_URL:http://localhost:5173/verify-email}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${IDENTITY_DB_URL:jdbc:h2:file:./data/identity_db}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate

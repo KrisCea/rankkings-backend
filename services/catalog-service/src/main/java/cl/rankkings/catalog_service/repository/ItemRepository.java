@@ -13,6 +13,8 @@ public interface ItemRepository extends JpaRepository<RankableItem, String> {
 
     List<RankableItem> findByParentIdOrderByPositionAsc(String parentId);
 
+    List<RankableItem> findAllByTitleContainingIgnoreCaseOrderByTitleAsc(String title);
+
     @Query("SELECT AVG(i.averageRating) FROM RankableItem i WHERE i.parentId = :parentId AND i.ratingsCount > 0")
     Double calculateChildrenAverageRating(@Param("parentId") String parentId);
 }

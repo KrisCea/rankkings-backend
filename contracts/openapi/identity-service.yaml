@@ -1,0 +1,485 @@
+openapi: 3.1.0
+info:
+  title: RankKings Identity Service API
+  version: 1.0.0
+  description: >-
+    Contrato del servicio de identidad expuesto mediante el API Gateway.
+    Las rutas se publican bajo /api. El gateway valida la sesión e inyecta
+    X-User-Id para las operaciones autenticadas; los clientes no deben enviar
+    ni poder suplantar ese encabezado.
+servers:
+  - url: http://localhost:8080/api
+    description: API Gateway local
+tags:
+  - name: Authentication
+  - name: Users
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      operationId: registerUser
+      summary: Registrar una cuenta
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Cuenta creada; se envía el correo de verificación.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /auth/login:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Iniciar sesión
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Sesión iniciada. El token se entrega en cookie, no en el JSON.
+          headers:
+            Set-Cookie:
+              description: >-
+                Cookie rk_token con HttpOnly, Secure en producción, Path=/,
+                SameSite=Lax y una expiración definida por la política de sesión.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      summary: Cerrar sesión
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Sesión invalidada y cookie rk_token expirada.
+          headers:
+            Set-Cookie:
+              description: Cookie rk_token expirada con Path=/.
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /auth/verify-email:
+    post:
+      tags: [Authentication]
+      operationId: verifyEmail
+      summary: Verificar correo electrónico
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "204":
+          description: Correo verificado.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "410":
+          description: Token inválido, expirado o ya utilizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /auth/resend-verification:
+    post:
+      tags: [Authentication]
+      operationId: resendVerification
+      summary: Solicitar reenvío del correo de verificación
+      description: >-
+        La respuesta no debe revelar si el correo está registrado. Aplicar
+        límites de tasa y respuestas equivalentes para cuentas existentes y no existentes.
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "204":
+          description: Solicitud aceptada.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /users/me:
+    get:
+      tags: [Users]
+      operationId: getCurrentUser
+      summary: Obtener el usuario de la sesión actual
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /users/me/share-contacts:
+    get:
+      tags: [Users]
+      operationId: getShareContacts
+      summary: Listar contactos disponibles para compartir
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Contactos del usuario.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /users/{username}:
+    get:
+      tags: [Users]
+      operationId: getUserProfile
+      summary: Obtener un perfil público por nombre de usuario
+      description: Si hay sesión, isFollowedByCurrentUser refleja al usuario actual.
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Username"
+      responses:
+        "200":
+          description: Perfil encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /users/{username}/follow:
+    post:
+      tags: [Users]
+      operationId: toggleFollow
+      summary: Alternar el seguimiento de un perfil
+      description: >-
+        Operación conmutativa según el estado actual. El servidor debe impedir
+        que un usuario se siga a sí mismo y garantizar la unicidad de la relación.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Username"
+      responses:
+        "200":
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: rk_token
+      description: Cookie HttpOnly emitida por POST /auth/login.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Alternativa para herramientas no navegador (por ejemplo, Swagger o
+        Postman), si está habilitada por el entorno. El navegador usa la cookie.
+  parameters:
+    Username:
+      name: username
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 30
+  responses:
+    BadRequest:
+      description: Solicitud inválida.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Unauthorized:
+      description: Sesión ausente, inválida o expirada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Operación no permitida.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Recurso no encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: Conflicto de unicidad o de estado del recurso.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    TooManyRequests:
+      description: Límite de solicitudes excedido.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServerError:
+      description: Error inesperado del servidor.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    RegisterInput:
+      type: object
+      additionalProperties: false
+      required: [displayName, username, email, password, captchaToken]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[A-Za-z0-9_]+$"
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+          writeOnly: true
+        captchaToken:
+          type: string
+          minLength: 1
+          writeOnly: true
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+          writeOnly: true
+    RegisterResult:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    AccountType:
+      type: string
+      enum: [individual, business]
+    UserRole:
+      type: string
+      enum: [user, admin]
+    UserSummary:
+      type: object
+      additionalProperties: false
+      required: [id, username, displayName, avatarUrl, accountType]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        accountType:
+          $ref: "#/components/schemas/AccountType"
+        isVerifiedBusiness:
+          type: boolean
+    User:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - displayName
+        - avatarUrl
+        - accountType
+        - isAuthenticated
+        - role
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        accountType:
+          $ref: "#/components/schemas/AccountType"
+        isVerifiedBusiness:
+          type: boolean
+        isAuthenticated:
+          type: boolean
+          const: true
+        role:
+          $ref: "#/components/schemas/UserRole"
+    UserProfile:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - displayName
+        - avatarUrl
+        - accountType
+        - followersCount
+        - followingCount
+        - postsCount
+        - isFollowedByCurrentUser
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        accountType:
+          $ref: "#/components/schemas/AccountType"
+        isVerifiedBusiness:
+          type: boolean
+        bio:
+          type: string
+        followersCount:
+          type: integer
+          minimum: 0
+        followingCount:
+          type: integer
+          minimum: 0
+        postsCount:
+          type: integer
+          minimum: 0
+        isFollowedByCurrentUser:
+          type: boolean
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

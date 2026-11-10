@@ -1,0 +1,59 @@
+﻿itemId,categoria,titulo,creador,anio,padre,posicion,postId
+item-1,music,Discovery,Daft Punk,2001,,,post-demo-item-1
+item-2,music,One More Time,Daft Punk,2001,item-1,1,post-demo-item-2
+item-3,music,Digital Love,Daft Punk,2001,item-1,2,post-demo-item-3
+item-4,music,"Harder, Better, Faster, Stronger",Daft Punk,2001,item-1,3,post-demo-item-4
+item-5,music,Something About Us,Daft Punk,2001,item-1,4,post-demo-item-5
+item-101,music,Random Access Memories,Daft Punk,2013,,,post-demo-item-101
+item-102,music,Get Lucky,Daft Punk,2013,item-101,1,post-demo-item-102
+item-103,music,Instant Crush,Daft Punk,2013,item-101,2,post-demo-item-103
+item-104,music,Giorgio by Moroder,Daft Punk,2013,item-101,3,post-demo-item-104
+item-110,music,Back to Black,Amy Winehouse,2006,,,post-demo-item-110
+item-111,music,Rehab,Amy Winehouse,2006,item-110,1,post-demo-item-111
+item-112,music,You Know I'm No Good,Amy Winehouse,2006,item-110,2,post-demo-item-112
+item-113,music,Back to Black,Amy Winehouse,2006,item-110,3,post-demo-item-113
+item-120,music,OK Computer,Radiohead,1997,,,post-demo-item-120
+item-121,music,Paranoid Android,Radiohead,1997,item-120,1,post-demo-item-121
+item-122,music,No Surprises,Radiohead,1997,item-120,2,post-demo-item-122
+item-130,music,Un Verano Sin Ti,Bad Bunny,2022,,,post-demo-item-130
+item-131,music,Tití Me Preguntó,Bad Bunny,2022,item-130,1,post-demo-item-131
+item-132,music,Me Porto Bonito,Bad Bunny,2022,item-130,2,post-demo-item-132
+item-140,music,The Dark Side of the Moon,Pink Floyd,1973,,,post-demo-item-140
+item-141,music,Time,Pink Floyd,1973,item-140,1,post-demo-item-141
+item-142,music,Money,Pink Floyd,1973,item-140,2,post-demo-item-142
+item-150,music,To Pimp a Butterfly,Kendrick Lamar,2015,,,post-demo-item-150
+item-151,music,King Kunta,Kendrick Lamar,2015,item-150,1,post-demo-item-151
+item-152,music,Alright,Kendrick Lamar,2015,item-150,2,post-demo-item-152
+item-160,music,Bocanada,Gustavo Cerati,1999,,,post-demo-item-160
+item-161,music,Puente,Gustavo Cerati,1999,item-160,1,post-demo-item-161
+item-162,music,Bocanada,Gustavo Cerati,1999,item-160,2,post-demo-item-162
+item-170,music,Corazones,Los Prisioneros,1990,,,post-demo-item-170
+item-171,music,Tren al Sur,Los Prisioneros,1990,item-170,1,post-demo-item-171
+item-172,music,Estrechez de Corazón,Los Prisioneros,1990,item-170,2,post-demo-item-172
+item-201,movies,Interstellar,Christopher Nolan,2014,,,post-demo-item-201
+item-202,movies,El viaje de Chihiro,Hayao Miyazaki,2001,,,post-demo-item-202
+item-203,movies,Parásitos,Bong Joon-ho,2019,,,post-demo-item-203
+item-204,movies,Arrival,Denis Villeneuve,2016,,,post-demo-item-204
+item-205,movies,Everything Everywhere All at Once,Daniel Kwan y Daniel Scheinert,2022,,,post-demo-item-205
+item-206,movies,Spider-Man: Into the Spider-Verse,"Bob Persichetti, Peter Ramsey y Rodney Rothman",2018,,,post-demo-item-206
+item-301,books,1984,George Orwell,1949,,,post-demo-item-301
+item-302,books,Dune,Frank Herbert,1965,,,post-demo-item-302
+item-303,books,Cien años de soledad,Gabriel García Márquez,1967,,,post-demo-item-303
+item-304,books,El hobbit,J. R. R. Tolkien,1937,,,post-demo-item-304
+item-305,books,El principito,Antoine de Saint-Exupéry,1943,,,post-demo-item-305
+item-306,books,La ciudad y los perros,Mario Vargas Llosa,1963,,,post-demo-item-306
+item-401,videogames,Hollow Knight,Team Cherry,2017,,,post-demo-item-401
+item-402,videogames,Stardew Valley,ConcernedApe,2016,,,post-demo-item-402
+item-403,videogames,Celeste,Maddy Makes Games,2018,,,post-demo-item-403
+item-404,videogames,Hades,Supergiant Games,2020,,,post-demo-item-404
+item-405,videogames,Portal 2,Valve,2011,,,post-demo-item-405
+item-406,videogames,The Legend of Zelda: Breath of the Wild,Nintendo,2017,,,post-demo-item-406
+item-501,podcasts,Podcast demo: Cultura Musical,RankKings Demo,2026,,,post-demo-item-501
+item-502,podcasts,Podcast demo: Tecnología sin filtro,RankKings Demo,2026,,,post-demo-item-502
+item-503,podcasts,Podcast demo: Cine en 20,RankKings Demo,2026,,,post-demo-item-503
+item-601,art,La noche estrellada,Vincent van Gogh,1889,,,post-demo-item-601
+item-602,art,La persistencia de la memoria,Salvador Dalí,1931,,,post-demo-item-602
+item-701,boardgames,Catan,Klaus Teuber,1995,,,post-demo-item-701
+item-702,boardgames,Ticket to Ride,Alan R. Moon,2004,,,post-demo-item-702
+item-801,concerts,Concierto demo: Noche de rock,RankKings Demo,2026,,,post-demo-item-801
+item-802,concerts,Festival demo: Música al aire libre,RankKings Demo,2026,,,post-demo-item-802

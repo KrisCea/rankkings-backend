@@ -33,6 +33,24 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
+    public List<RankableItemDto> searchItems(String query, String currentUserId) {
+        List<RankableItem> items = itemRepository.findAllByTitleContainingIgnoreCaseOrderByTitleAsc(
+                query == null ? "" : query.trim());
+        if (items.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> savedIds = currentUserId == null
+                ? Set.of()
+                : savedItemRepository.findSavedItemIdsByUser(
+                        currentUserId, items.stream().map(RankableItem::getId).toList());
+
+        return items.stream()
+                .map(item -> toDto(item, savedIds.contains(item.getId())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<RankableItemDto> getChildren(String parentId, String currentUserId) {
         if (!itemRepository.existsById(parentId)) {
             throw new EntityNotFoundException("Obra padre no encontrada: " + parentId);
