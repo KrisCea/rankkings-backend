@@ -2,6 +2,8 @@ package cl.rankkings.identity_service.client;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,17 +22,25 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class CaptchaClient {
     private final ObjectMapper mapper;
+    private final Environment environment;
     @Value("${rankkings.turnstile-secret:}") private String turnstileSecret;
     @Value("${rankkings.dev-captcha-bypass:false}") private boolean devCaptchaBypass;
-    @Value("${spring.profiles.active:local}") private String activeProfile;
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 
     public void verify(String token) {
-        if (devCaptchaBypass && (activeProfile.equals("local") || activeProfile.equals("test"))) {
+        if (devCaptchaBypass
+                && environment.acceptsProfiles(Profiles.of("local", "test"))
+                && !environment.acceptsProfiles(Profiles.of("prod"))) {
             return;
         }
         if (turnstileSecret.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Captcha no configurado");
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Captcha no configurado: define TURNSTILE_SECRET"
+            );
+        }
+        if (token == null || token.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha inválido");
         }
 
         String form = "secret=" + encode(turnstileSecret) + "&response=" + encode(token);

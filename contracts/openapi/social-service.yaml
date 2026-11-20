@@ -3,7 +3,8 @@ info:
   title: RankKings Social Service API
   version: 1.0.0
   description: >-
-    Feed, publicaciones, interacciones y comentarios. El gateway reenvía también
+    Feed, publicaciones, interacciones y comentarios. Las reseñas son comentarios
+    del post de un Rankable Item, no publicaciones independientes. El gateway reenvía también
     /users/{username}/posts y /items/{itemId}/reviews a este servicio antes de
     las rutas comodín de identidad y catálogo. X-User-Id es interno y solo debe
     ser inyectado por el gateway.
@@ -41,7 +42,7 @@ paths:
     post:
       tags: [Posts]
       operationId: createPost
-      summary: Publicar una obra existente o una reseña
+      summary: Publicar un Rankable Item existente
       security:
         - SessionCookie: []
       requestBody:
@@ -105,6 +106,27 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+  /posts/by-item/{itemId}:
+    get:
+      tags: [Posts]
+      operationId: getPostForItem
+      summary: Obtener la publicación asociada a un Rankable Item
+      description: Permite resolver la publicación cuando el catálogo aún no tiene su postId sincronizado.
+      security:
+        - {}
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "200":
+          description: Publicación asociada a la obra.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /users/{username}/posts:
     get:
       tags: [Posts]
@@ -123,13 +145,15 @@ paths:
             $ref: "#/components/schemas/PostKind"
       responses:
         "200":
-          description: Publicaciones del perfil.
+          description: Posts del perfil; kind=review devuelve reseñas como comentarios asociados a su post.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Post"
+                  oneOf:
+                    - $ref: "#/components/schemas/Post"
+                    - $ref: "#/components/schemas/Comment"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -139,7 +163,7 @@ paths:
       tags: [Posts]
       operationId: getReviewsForItem
       summary: Listar reseñas asociadas a una obra
-      description: La respuesta son publicaciones Post cuyo kind es review.
+      description: La respuesta son comentarios de reseña asociados al post del Rankable Item.
       security:
         - {}
         - SessionCookie: []
@@ -154,11 +178,159 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Post"
+                  $ref: "#/components/schemas/Comment"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+  /posts/{postId}/reviews:
+    post:
+      tags: [Comments]
+      operationId: addReview
+      summary: Crear una reseña como comentario del post del Rankable Item
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewReviewInput"
+      responses:
+        "201":
+          description: Reseña creada como comentario del post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /posts/{postId}/media/uploads:
+    post:
+      tags: [Posts]
+      operationId: createImageUploadUrl
+      summary: Obtener una URL S3 firmada para subir una imagen al post
+      description: >-
+        Solo el autor del post puede subir hasta cuatro adjuntos (20 MB en total).
+        Las imágenes admitidas son JPEG, PNG y WebP, hasta 10 MB cada una.
+        La carga expira en cinco minutos. El cliente debe hacer         PUT con los encabezados indicados en la respuesta y confirmar después de subir el objeto.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageUploadInput"
+      responses:
+        "201":
+          description: URL de carga firmada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageUploadUrl"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: El usuario no es autor del post.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: Almacenamiento S3 no configurado.
+  /posts/{postId}/media/{mediaId}/complete:
+    post:
+      tags: [Posts]
+      operationId: confirmImageUpload
+      summary: Confirmar y validar una imagen subida a S3
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+        - name: mediaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Imagen confirmada y visible en el post.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: El usuario no es autor del post.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: La carga aún no está disponible o ya fue confirmada.
+  /posts/{postId}/media/external:
+    post:
+      tags: [Posts]
+      operationId: addExternalMedia
+      summary: Asociar un video o enlace HTTPS externo al post
+      description: Los videos se admiten solo mediante enlace hasta contar con verificación de duración y moderación.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExternalMediaInput"
+      responses:
+        "201":
+          description: Enlace externo asociado al post.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: El usuario no es autor del post.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /posts/{postId}/media/{mediaId}:
+    delete:
+      tags: [Posts]
+      operationId: deletePostMedia
+      summary: Quitar un adjunto del post
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+        - name: mediaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Adjunto eliminado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: El usuario no es autor del post.
+        "404":
+          $ref: "#/components/responses/NotFound"
   /posts/{postId}/vote:
     post:
       tags: [Posts]
@@ -567,7 +739,7 @@ components:
           format: uri
         type:
           type: string
-          enum: [image, video]
+          enum: [image, video, external]
         thumbnailUrl:
           type: string
           format: uri
@@ -667,7 +839,7 @@ components:
     Comment:
       type: object
       additionalProperties: false
-      required: [id, postId, author, text, likesCount, likedByCurrentUser, createdAt]
+      required: [id, postId, author, text, kind, likesCount, likedByCurrentUser, createdAt]
       properties:
         id:
           type: string
@@ -681,6 +853,13 @@ components:
           $ref: "#/components/schemas/CommentAuthor"
         text:
           type: string
+        kind:
+          type: string
+          enum: [comment, review]
+        authorScore:
+          type: number
+          minimum: 1
+          maximum: 10
         likesCount:
           type: integer
           minimum: 0
@@ -698,15 +877,72 @@ components:
           type: string
           minLength: 1
         kind:
-          $ref: "#/components/schemas/PostKind"
+          type: string
+          enum: [item]
         caption:
           type: string
+          maxLength: 2000
+    NewReviewInput:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
           maxLength: 2000
         authorScore:
           type: number
           minimum: 1
           maximum: 10
-          description: Obligatorio cuando kind es review.
+          description: Nota opcional del Rankable Item; se guarda como rating del autor.
+    ImageUploadInput:
+      type: object
+      additionalProperties: false
+      required: [contentType, sizeBytes]
+      properties:
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 10485760
+    ImageUploadUrl:
+      type: object
+      additionalProperties: false
+      required: [mediaId, uploadUrl, method, headers, expiresAt]
+      properties:
+        mediaId:
+          type: string
+        uploadUrl:
+          type: string
+          format: uri
+        method:
+          type: string
+          enum: [PUT]
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            Content-Type: image/jpeg
+            If-None-Match: "*"
+        expiresAt:
+          type: string
+          format: date-time
+    ExternalMediaInput:
+      type: object
+      additionalProperties: false
+      required: [url, type]
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+        type:
+          type: string
+          enum: [video, external]
     NewCommentInput:
       type: object
       additionalProperties: false

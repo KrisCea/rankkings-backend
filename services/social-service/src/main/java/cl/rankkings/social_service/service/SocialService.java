@@ -4,6 +4,7 @@ import cl.rankkings.social_service.client.CatalogServiceClient;
 import cl.rankkings.social_service.client.IdentityServiceClient;
 import cl.rankkings.social_service.dto.SocialDtos.NewCommentInput;
 import cl.rankkings.social_service.dto.SocialDtos.NewPostInput;
+import cl.rankkings.social_service.dto.SocialDtos.NewReviewInput;
 import cl.rankkings.social_service.dto.SocialDtos.RatingInput;
 import cl.rankkings.social_service.dto.SocialDtos.ShareInput;
 import cl.rankkings.social_service.model.CommentLike;
@@ -42,6 +43,7 @@ public class SocialService {
     private final ShareRepository shares;
     private final CatalogServiceClient catalogClient;
     private final IdentityServiceClient identityClient;
+    private final PostMediaService postMediaService;
     @Value("${rankkings.internal-key:}") private String internalKey;
 
     @Transactional(readOnly = true)
@@ -60,9 +62,20 @@ public class SocialService {
     }
 
     @Transactional(readOnly = true)
+    public Map<String, Object> getItemPost(String itemId, String viewerId) {
+        SocialPost post = posts.findFirstByItemIdAndKindOrderByCreatedAtAsc(itemId, "item")
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "La obra aún no tiene publicación"));
+        return present(post, viewerId);
+    }
+
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> userPosts(String username, String kind, String viewerId) {
         validateKind(kind);
         JsonNode user = identityClient.findUserByUsername(username);
+        if ("review".equals(kind)) {
+            return comments.findByAuthorIdAndKindOrderByCreatedAtDesc(key(user, "id"), "review")
+                    .stream().limit(100).map(comment -> presentComment(comment, viewerId)).toList();
+        }
         return posts.findByAuthorIdAndKindOrderByCreatedAtDesc(key(user, "id"), kind)
                 .stream().limit(100).map(post -> present(post, viewerId)).toList();
     }
@@ -70,17 +83,19 @@ public class SocialService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> itemReviews(String itemId, String viewerId) {
         catalogClient.getItem(itemId, null);
-        return posts.findByItemIdAndKindOrderByCreatedAtDesc(itemId, "review")
-                .stream().map(post -> present(post, viewerId)).toList();
+        return posts.findByItemIdAndKindOrderByCreatedAtDesc(itemId, "item").stream()
+                .findFirst()
+                .map(post -> comments.findByPostIdAndKindOrderByCreatedAtDesc(post.getId(), "review")
+                        .stream().map(comment -> presentComment(comment, viewerId)).toList())
+                .orElseGet(List::of);
     }
 
     @Transactional
     public Map<String, Object> createPost(NewPostInput input, String viewerId) {
         String authorId = requireUser(viewerId);
         validateKind(input.kind());
-        if ("review".equals(input.kind())
-                && (input.authorScore() == null || input.authorScore() < 1 || input.authorScore() > 10)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La reseña requiere nota de 1 a 10");
+        if ("review".equals(input.kind())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Crea la reseña como comentario del post del ítem");
         }
 
         JsonNode item = catalogClient.getItem(input.itemId(), null);
@@ -102,9 +117,42 @@ public class SocialService {
         post.setItemId(input.itemId());
         post.setKind(input.kind());
         post.setCaption(input.caption() == null ? "" : input.caption().trim());
-        post.setReviewScore("review".equals(input.kind()) ? input.authorScore() : null);
         posts.save(post);
         return present(post, viewerId);
+    }
+
+    @Transactional
+    public Map<String, Object> addReview(String postId, NewReviewInput input, String viewerId) {
+        String authorId = requireUser(viewerId);
+        SocialPost post = requirePost(postId);
+        requireItemPost(post);
+
+        String text = input.text().trim();
+        if (text.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La reseña no puede estar vacía");
+        }
+
+        PostComment review = new PostComment();
+        review.setId(UUID.randomUUID().toString());
+        review.setPostId(postId);
+        review.setAuthorId(authorId);
+        review.setKind("review");
+        review.setText(text);
+        comments.save(review);
+
+        if (input.authorScore() != null) {
+            PostRating rating = ratings.findByPostIdAndUserId(postId, authorId).orElseGet(() -> {
+                PostRating newRating = new PostRating();
+                newRating.setId(UUID.randomUUID().toString());
+                newRating.setPostId(postId);
+                newRating.setUserId(authorId);
+                return newRating;
+            });
+            rating.setScore(input.authorScore());
+            ratings.saveAndFlush(rating);
+            syncCatalogRatings(post);
+        }
+        return presentComment(review, viewerId);
     }
 
     @Transactional
@@ -128,6 +176,7 @@ public class SocialService {
     public Map<String, Object> rate(String postId, RatingInput input, String viewerId) {
         requireUser(viewerId);
         SocialPost post = requirePost(postId);
+        requireItemPost(post);
         PostRating rating = ratings.findByPostIdAndUserId(postId, viewerId).orElseGet(() -> {
             PostRating newRating = new PostRating();
             newRating.setId(UUID.randomUUID().toString());
@@ -145,6 +194,7 @@ public class SocialService {
     public Map<String, Object> removeRating(String postId, String viewerId) {
         requireUser(viewerId);
         SocialPost post = requirePost(postId);
+        requireItemPost(post);
         ratings.findByPostIdAndUserId(postId, viewerId).ifPresent(ratings::delete);
         ratings.flush();
         syncCatalogRatings(post);
@@ -237,10 +287,13 @@ public class SocialService {
         result.put("category", key(item, "category"));
         result.put("author", publicAuthor(author));
         result.put("caption", post.getCaption());
+        List<Map<String, Object>> mediaItems = new java.util.ArrayList<>();
         String cover = key(item, "coverUrl");
-        result.put("media", cover.isBlank()
-                ? List.of()
-                : List.of(Map.of("id", post.getId() + "-cover", "url", cover, "type", "image")));
+        if (!cover.isBlank()) {
+            mediaItems.add(Map.of("id", post.getId() + "-cover", "url", cover, "type", "image"));
+        }
+        mediaItems.addAll(postMediaService.mediaForPost(post.getId()));
+        result.put("media", mediaItems);
         result.put("rankableItem", item);
         if (post.getReviewScore() != null) {
             result.put("review", Map.of("authorScore", post.getReviewScore()));
@@ -279,6 +332,11 @@ public class SocialService {
                 "avatarUrl", key(author, "avatarUrl")
         ));
         result.put("text", comment.getText());
+        result.put("kind", comment.getKind());
+        if ("review".equals(comment.getKind())) {
+            ratings.findByPostIdAndUserId(comment.getPostId(), comment.getAuthorId())
+                    .ifPresent(rating -> result.put("authorScore", rating.getScore()));
+        }
         result.put("likesCount", likes.countByCommentId(comment.getId()));
         result.put("likedByCurrentUser", viewerId != null
                 && likes.findByCommentIdAndUserId(comment.getId(), viewerId).isPresent());
@@ -309,6 +367,12 @@ public class SocialService {
     private SocialPost requirePost(String id) {
         return posts.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publicación no encontrada"));
+    }
+
+    private void requireItemPost(SocialPost post) {
+        if (!"item".equals(post.getKind())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La operación debe asociarse al post del Rankable Item");
+        }
     }
 
     private PostComment requireComment(String id) {

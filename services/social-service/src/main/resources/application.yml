@@ -16,6 +16,10 @@ rankkings:
   internal-key: ${INTERNAL_SERVICE_KEY:}
   identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
   catalog-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+  media:
+    s3:
+      bucket: ${MEDIA_S3_BUCKET:}
+      region: ${AWS_REGION:us-east-1}
 
 ---
 spring:

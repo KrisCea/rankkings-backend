@@ -92,6 +92,12 @@ También hay una prueba de integración por terminal que ejecuta login, consulta
 
 El script solicita el correo y la contraseña de una cuenta ya verificada y **crea registros de prueba**. Los datos se guardan en H2 local; para limpiar la base de pruebas, detén los servicios y elimina manualmente los archivos `data` del servicio correspondiente.
 
+### Multimedia y reseñas en posts
+
+Las reseñas nuevas se crean como comentarios del post del Rankable Item (`POST /posts/{postId}/reviews`); `POST /posts` rechaza reseñas independientes. Las imágenes se suben a un bucket privado de Amazon S3 mediante una URL firmada: configura `MEDIA_S3_BUCKET`, `AWS_REGION` y las credenciales de AWS del proveedor estándar (variables de entorno o perfil local). No guardes credenciales en el repositorio. La configuración CORS del bucket debe permitir `PUT` desde el origen del frontend y los encabezados `Content-Type` e `If-None-Match`. Configura además una regla de ciclo de vida para borrar objetos del prefijo `pending-post-media/` después de un día; no apliques esa regla al prefijo `post-media/`.
+
+Límites iniciales: hasta cuatro adjuntos y 20 MiB por post; cada imagen puede pesar hasta 10 MiB y debe ser JPEG, PNG o WebP. La URL de subida vence en cinco minutos; después de subir el archivo se debe llamar al endpoint de confirmación, que verifica tamaño, MIME y firma del archivo. Los posts devuelven URLs firmadas de lectura que vencen en diez minutos. Los binarios quedan en S3 y sus metadatos en la base configurada para Social (H2 en desarrollo o la base indicada para el entorno); esto no configura una base AWS administrada. Los videos por ahora solo se admiten como enlaces HTTPS externos, no se suben hasta poder validar su duración y moderarlos. El backend no descarga ni incrusta esos enlaces, y aún no aplica moderación de contenido a las imágenes.
+
 ## Ejecutar las pruebas automatizadas
 
 Desde la raíz, ejecuta las pruebas de cada módulo:
@@ -119,6 +125,17 @@ Cada servicio se construye de forma independiente; la raíz no es un proyecto Ma
 ## Persistencia y configuración
 
 Con el perfil `local`, Identity, Catalog y Social usan archivos H2 en `services\<servicio>\data\`. Los datos sobreviven al reinicio mientras no borres esos archivos. El catálogo de ejemplo se carga automáticamente al iniciar Catalog. El perfil `prod` usa PostgreSQL y no importa datos de ejemplo; configura sus credenciales y esquema antes de iniciarlo.
+
+Para levantar las bases locales definidas por el ERS (PostgreSQL y MongoDB), ejecuta desde la raíz:
+
+```powershell
+docker compose up -d
+docker compose ps
+```
+
+PostgreSQL queda disponible en `localhost:5432` (base y usuario `rankkings`) y MongoDB en `localhost:27017` (base `rankkings_catalog`, autenticación `admin`). Las contraseñas predeterminadas (`rankkings_local`) son solo para desarrollo local; puedes cambiarlas con las variables `POSTGRES_PASSWORD` y `MONGO_ROOT_PASSWORD`, y configurar los puertos con `POSTGRES_PORT` y `MONGO_PORT`. Los puertos se enlazan únicamente a `127.0.0.1`; los datos persisten en volúmenes de Docker. `docker compose down` detiene los contenedores sin borrar esos datos; `docker compose down -v` los elimina.
+
+Esta configuración levanta solo las bases: los servicios siguen usando H2 con el perfil `local` y todavía no se conectan a MongoDB. La integración de los servicios con PostgreSQL/MongoDB y las pruebas Testcontainers indicadas en el ERS quedan para una etapa posterior.
 
 Para configurar envío real de verificación de correo se requieren `RESEND_API_KEY` y `VERIFICATION_FROM_EMAIL`. Consulta [docs/IDENTITY_SOCIAL_IMPLEMENTADOS.md](docs/IDENTITY_SOCIAL_IMPLEMENTADOS.md) para más detalles de configuración, contratos y limitaciones.
 

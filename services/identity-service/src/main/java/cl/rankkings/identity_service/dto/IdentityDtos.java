@@ -13,7 +13,7 @@ public final class IdentityDtos {
             @NotBlank @Pattern(regexp = "[A-Za-z0-9_]{3,30}") String username,
             @NotBlank @Email String email,
             @NotBlank @Size(min = 10, max = 128) String password,
-            @NotBlank String captchaToken
+            String captchaToken
     ) {}
 
     public record LoginInput(@NotBlank @Email String email, @NotBlank String password) {}

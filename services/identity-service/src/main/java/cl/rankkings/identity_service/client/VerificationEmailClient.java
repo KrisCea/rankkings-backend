@@ -2,6 +2,8 @@ package cl.rankkings.identity_service.client;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,21 +23,33 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class VerificationEmailClient {
     private final ObjectMapper mapper;
+    private final Environment environment;
     @Value("${rankkings.dev-verification-logging:false}") private boolean devVerificationLogging;
-    @Value("${spring.profiles.active:local}") private String activeProfile;
     @Value("${rankkings.resend-api-key:}") private String resendApiKey;
     @Value("${rankkings.email-from:}") private String emailFrom;
-    @Value("${rankkings.verify-url:http://localhost:5173/verify-email}") private String verifyUrl;
+    @Value("${rankkings.verify-url:}") private String verifyUrl;
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 
     public void sendVerification(String email, String token) {
-        String link = verifyUrl + "?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
-        if (devVerificationLogging && activeProfile.equals("local")) {
+        if (verifyUrl.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Configura VERIFICATION_URL para completar la verificación de correo"
+            );
+        }
+        String separator = verifyUrl.contains("?") ? "&" : "?";
+        String link = verifyUrl + separator + "token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+        if (devVerificationLogging
+                && environment.acceptsProfiles(Profiles.of("local"))
+                && !environment.acceptsProfiles(Profiles.of("prod"))) {
             System.out.println("[LOCAL ONLY] Verificar cuenta " + email + ": " + link);
             return;
         }
         if (resendApiKey.isBlank() || emailFrom.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Configura el servicio de verificación de correo");
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Configura RESEND_API_KEY y VERIFICATION_FROM_EMAIL para enviar el correo"
+            );
         }
         try {
             String body = mapper.writeValueAsString(Map.of(

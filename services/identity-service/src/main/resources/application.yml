@@ -21,7 +21,7 @@ rankkings:
   social-url: ${SOCIAL_SERVICE_URL:http://localhost:8083}
   resend-api-key: ${RESEND_API_KEY:}
   email-from: ${VERIFICATION_FROM_EMAIL:}
-  verify-url: ${VERIFICATION_URL:http://localhost:5173/verify-email}
+  verify-url: ${VERIFICATION_URL:}
 
 ---
 spring:
@@ -30,6 +30,8 @@ spring:
       on-profile: local
   datasource:
     url: ${IDENTITY_DB_URL:jdbc:h2:file:./data/identity_db}
+rankkings:
+  verify-url: ${VERIFICATION_URL:http://localhost:5173/verify-email}
 
 ---
 spring:
@@ -43,3 +45,5 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+rankkings:
+  verify-url: ${VERIFICATION_URL:}

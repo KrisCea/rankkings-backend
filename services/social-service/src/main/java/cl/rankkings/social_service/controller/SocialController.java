@@ -2,8 +2,12 @@ package cl.rankkings.social_service.controller;
 
 import cl.rankkings.social_service.dto.SocialDtos.NewCommentInput;
 import cl.rankkings.social_service.dto.SocialDtos.NewPostInput;
+import cl.rankkings.social_service.dto.SocialDtos.NewReviewInput;
 import cl.rankkings.social_service.dto.SocialDtos.RatingInput;
 import cl.rankkings.social_service.dto.SocialDtos.ShareInput;
+import cl.rankkings.social_service.dto.SocialDtos.ExternalMediaInput;
+import cl.rankkings.social_service.dto.SocialDtos.ImageUploadInput;
+import cl.rankkings.social_service.service.PostMediaService;
 import cl.rankkings.social_service.service.SocialService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SocialController {
     private final SocialService socialService;
+    private final PostMediaService postMediaService;
 
     @GetMapping("/posts")
     public List<Map<String, Object>> feed(
@@ -47,6 +52,14 @@ public class SocialController {
             @RequestHeader(value = "X-User-Id", required = false) String viewerId
     ) {
         return socialService.getPost(id, viewerId);
+    }
+
+    @GetMapping("/posts/by-item/{itemId}")
+    public Map<String, Object> itemPost(
+            @PathVariable String itemId,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return socialService.getItemPost(itemId, viewerId);
     }
 
     @GetMapping("/users/{username}/posts")
@@ -73,6 +86,55 @@ public class SocialController {
             @RequestHeader(value = "X-User-Id", required = false) String viewerId
     ) {
         return socialService.createPost(input, viewerId);
+    }
+
+    @PostMapping("/posts/{id}/reviews")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, Object> review(
+            @PathVariable String id,
+            @Valid @RequestBody NewReviewInput input,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return socialService.addReview(id, input, viewerId);
+    }
+
+    @PostMapping("/posts/{id}/media/uploads")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, Object> prepareImageUpload(
+            @PathVariable String id,
+            @Valid @RequestBody ImageUploadInput input,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return postMediaService.prepareImageUpload(id, input, viewerId);
+    }
+
+    @PostMapping("/posts/{id}/media/{mediaId}/complete")
+    public Map<String, String> confirmImageUpload(
+            @PathVariable String id,
+            @PathVariable String mediaId,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return postMediaService.confirmImageUpload(id, mediaId, viewerId);
+    }
+
+    @PostMapping("/posts/{id}/media/external")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, String> addExternalMedia(
+            @PathVariable String id,
+            @Valid @RequestBody ExternalMediaInput input,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return postMediaService.addExternalMedia(id, input, viewerId);
+    }
+
+    @DeleteMapping("/posts/{id}/media/{mediaId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMedia(
+            @PathVariable String id,
+            @PathVariable String mediaId,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        postMediaService.deleteMedia(id, mediaId, viewerId);
     }
 
     @PostMapping("/posts/{id}/vote")

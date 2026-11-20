@@ -4,10 +4,16 @@ $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $env:SPRING_PROFILES_ACTIVE = "local"
 $env:INTERNAL_SERVICE_KEY = [Guid]::NewGuid().ToString("N")
-$env:DEV_CAPTCHA_BYPASS = "true" # Sólo para development; NO usar en producción
-$env:DEV_VERIFICATION_LOGGING = "true" # Token de confirmación visible en ventana Identity
+if ([string]::IsNullOrWhiteSpace($env:DEV_CAPTCHA_BYPASS)) {
+  $env:DEV_CAPTCHA_BYPASS = "true"
+}
+if ([string]::IsNullOrWhiteSpace($env:DEV_VERIFICATION_LOGGING)) {
+  $env:DEV_VERIFICATION_LOGGING = "true"
+}
 $env:COOKIE_SECURE = "false" # localhost HTTP
 $services = @("catalog-service", "identity-service", "social-service", "api-gateway")
+Write-Host "Bypass local de captcha: $env:DEV_CAPTCHA_BYPASS"
+Write-Host "Verificación por log local: $env:DEV_VERIFICATION_LOGGING"
 foreach ($svc in $services) {
   $cwd = Join-Path $root ("services\" + $svc)
   if ($svc -ne "api-gateway") {

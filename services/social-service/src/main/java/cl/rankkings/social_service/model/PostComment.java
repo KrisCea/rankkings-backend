@@ -8,6 +8,7 @@ public class PostComment {
     @Id private String id;
     @Column(nullable=false) private String postId;
     @Column(nullable=false) private String authorId;
+    @Column(nullable=false, length=20, columnDefinition="varchar(20) default 'comment'") private String kind="comment";
     private String parentId;
     private String replyToUsername;
     @Column(nullable=false,length=2000) private String text;

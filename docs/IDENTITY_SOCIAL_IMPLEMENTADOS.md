@@ -11,7 +11,7 @@
 ## Desarrollo local (Windows)
 
 1. Instalar **JDK 25**, npm/Node compatible con Vite y conexión para descargar Maven la primera vez.
-2. Abrir PowerShell en `rankkings-backend` y ejecutar `./scripts/start-local.ps1`: abre cuatro ventanas de servicio con un secreto común **aleatorio en memoria** y habilita captcha y verificación por log **sólo local**. No cerrar esas ventanas.
+2. Abrir PowerShell en `rankkings-backend` y ejecutar `./scripts/start-local.ps1`: abre cuatro ventanas de servicio con un secreto común **aleatorio en memoria**. Por defecto omite Turnstile y registra el enlace de verificación **sólo localmente**. No cerrar esas ventanas.
 3. Abrir otro PowerShell en el repositorio del frontend, `cd frontend`, ejecutar `npm ci` y `npm run dev`. Carga `.env.development` con la URL del Gateway y el captcha local de desarrollo.
 4. Registrar un usuario. Copiar la URL de verificación que aparece en la **ventana de Identity** y abrirla en el navegador. Iniciar sesión.
 5. Abrir `http://localhost:5173/create-post`, utilizar el item de prueba `item-1`, crear reseña y probar interacciones.
@@ -21,7 +21,13 @@ Los cuatro servicios deben compartir `INTERNAL_SERVICE_KEY` en el mismo entorno 
 
 ### Configuración de correo real
 
-Para no enviar enlaces falsos de verificación, Identity exige `RESEND_API_KEY`, `VERIFICATION_FROM_EMAIL` (remitente verificado con Resend) y opcionalmente `VERIFICATION_URL=https://<tu-dominio>/verify-email` en entornos no locales. El modo local `DEV_VERIFICATION_LOGGING=true` imprime la URL de verificación **sólo si** el perfil es `local`; nunca configurar así una instalación pública.
+Identity usa Resend para correo real. Configura `RESEND_API_KEY`, `VERIFICATION_FROM_EMAIL` (remitente verificado con Resend) y `VERIFICATION_URL` (URL pública del frontend terminada en `/verify-email`). En producción no se inventa una URL local: si falta la configuración, el registro falla con un error explícito.
+
+Para probar el envío real desde `start-local.ps1`, define antes de ejecutarlo `DEV_VERIFICATION_LOGGING=false`, `RESEND_API_KEY`, `VERIFICATION_FROM_EMAIL` y `VERIFICATION_URL`. En el frontend configura también `VITE_DEV_VERIFICATION_LOGGING=false`. No compartas ni guardes las claves en el repositorio. Por defecto, `DEV_VERIFICATION_LOGGING=true` imprime el enlace en la consola de Identity sólo con el perfil `local`.
+
+### Configuración de CAPTCHA real
+
+Para usar Cloudflare Turnstile, configura `TURNSTILE_SECRET` en Identity y `VITE_TURNSTILE_SITE_KEY` en el frontend. Para ejecutar el frontend y backend locales con validación real, define `DEV_CAPTCHA_BYPASS=false` antes de iniciar el backend y `VITE_DEV_CAPTCHA_BYPASS=false` en el frontend. Sin una clave secreta el backend falla explícitamente; el bypass sólo se acepta con el perfil `local` o `test` y nunca con `prod`.
 
 ### Producción — trabajo pendiente obligatorio
 

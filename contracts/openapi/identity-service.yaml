@@ -355,6 +355,7 @@ components:
           type: string
           minLength: 1
           writeOnly: true
+          description: Required and validated by Turnstile unless the Identity local/test bypass is explicitly enabled.
     LoginInput:
       type: object
       additionalProperties: false

@@ -1,7 +1,9 @@
 package cl.rankkings.social_service;
 import cl.rankkings.social_service.model.PostVote;
+import cl.rankkings.social_service.model.PostComment;
 import cl.rankkings.social_service.model.SocialPost;
 import cl.rankkings.social_service.repository.PostRepository;
+import cl.rankkings.social_service.repository.CommentRepository;
 import cl.rankkings.social_service.repository.VoteRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SocialPersistenceTest {
     @Autowired PostRepository posts;
     @Autowired VoteRepository votes;
+    @Autowired CommentRepository comments;
     @Test void persistsPostsAndVotes() {
         SocialPost p=new SocialPost();p.setId(UUID.randomUUID().toString());p.setAuthorId("user-demo");p.setItemId("item-demo");p.setKind("review");p.setCaption("Reseña de prueba");
         posts.saveAndFlush(p);
@@ -20,5 +23,14 @@ class SocialPersistenceTest {
         votes.saveAndFlush(v);
         assertEquals(1,votes.countByPostId(p.getId()));
         assertEquals("review",posts.findById(p.getId()).orElseThrow().getKind());
+
+        PostComment review = new PostComment();
+        review.setId(UUID.randomUUID().toString());
+        review.setPostId(p.getId());
+        review.setAuthorId("user-demo");
+        review.setKind("review");
+        review.setText("Reseña como comentario");
+        comments.saveAndFlush(review);
+        assertEquals("review", comments.findById(review.getId()).orElseThrow().getKind());
     }
 }
