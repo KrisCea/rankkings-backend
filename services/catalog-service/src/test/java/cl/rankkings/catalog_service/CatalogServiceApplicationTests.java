@@ -1,11 +1,17 @@
 package cl.rankkings.catalog_service;
 
+import cl.rankkings.catalog_service.dto.CatalogDtos.CreateRankableItemInput;
+import cl.rankkings.catalog_service.dto.CatalogDtos.CreatorInput;
 import cl.rankkings.catalog_service.repository.ItemRepository;
 import cl.rankkings.catalog_service.service.CatalogService;
+import org.springframework.transaction.annotation.Transactional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.Map;
+import java.util.UUID;
 
 @SpringBootTest
 class CatalogServiceApplicationTests {
@@ -35,6 +41,55 @@ class CatalogServiceApplicationTests {
 		Assertions.assertEquals(
 				"item-401",
 				catalogService.searchItems("hOlLoW", null).getFirst().id()
+		);
+	}
+
+	@Test
+	@Transactional
+	void createsRankableItemsWithGeneratedInternalIdsAndOptionalLinks() {
+		var item = catalogService.createItem(new CreateRankableItemInput(
+				"books",
+				"  The Example Book  ",
+				null,
+				new CreatorInput(null, "Author", null, null, null),
+				null,
+				null,
+				null,
+				Map.of("format", "novel"),
+				null,
+				"user-1",
+				"post-1"
+		));
+
+		UUID.fromString(item.id());
+		Assertions.assertEquals("The Example Book", item.title());
+		Assertions.assertEquals("post-1", item.postId());
+		Assertions.assertEquals("", item.coverUrl());
+		Assertions.assertEquals(Map.of(), item.identifiers());
+		Assertions.assertEquals(Map.of("format", "novel"), item.details());
+		Assertions.assertEquals(java.util.List.of(), item.externalLinks());
+		Assertions.assertEquals("unverified", item.verificationStatus());
+	}
+
+	@Test
+	void rejectsMissingCategorySpecificDetails() {
+		var input = new CreateRankableItemInput(
+				"concerts",
+				"Live show",
+				null,
+				new CreatorInput(null, "Artist", null, null, null),
+				null,
+				null,
+				null,
+				Map.of("venue", "Arena", "city", "Santiago"),
+				null,
+				"user-1",
+				"post-1"
+		);
+
+		Assertions.assertThrows(
+				org.springframework.web.server.ResponseStatusException.class,
+				() -> catalogService.createItem(input)
 		);
 	}
 

@@ -139,7 +139,7 @@ components:
       additionalProperties: true
       description: >-
         Misma representación que la respuesta del catálogo. Como mínimo debe
-        incluir id, category, title, creator, uploadedBy, coverUrl, identifiers,
+        incluir id, category, title, creator, uploadedBy, identifiers y details,
         verificationStatus, postId, averageRating, ratingsCount, childrenCount,
         savedByCurrentUser, savesCount, externalLinks y createdAt.
       required:
@@ -148,8 +148,8 @@ components:
         - title
         - creator
         - uploadedBy
-        - coverUrl
         - identifiers
+        - details
         - verificationStatus
         - postId
         - averageRating
@@ -173,8 +173,12 @@ components:
           type: string
         coverUrl:
           type: string
-          format: uri
+          description: URL de portada; puede estar vacío si la portada se subió como imagen del post.
         identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        details:
           type: object
           additionalProperties:
             type: string

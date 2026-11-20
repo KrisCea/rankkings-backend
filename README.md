@@ -92,6 +92,20 @@ También hay una prueba de integración por terminal que ejecuta login, consulta
 
 El script solicita el correo y la contraseña de una cuenta ya verificada y **crea registros de prueba**. Los datos se guardan en H2 local; para limpiar la base de pruebas, detén los servicios y elimina manualmente los archivos `data` del servicio correspondiente.
 
+### Datos ficticios para probar el feed
+
+Al iniciar los servicios con `.\scripts\start-local.ps1`, el perfil `local` crea tres cuentas verificadas y hasta 21 publicaciones de prueba asociadas a obras del catálogo; varias son obras reales como *OK Computer*, *Interstellar*, *1984*, *Dune*, *Hollow Knight* y *The Legend of Zelda: Breath of the Wild*. También se agregan algunas reseñas, ratings y votos para probar los estados de interacción. La carga es idempotente y no reemplaza publicaciones existentes; no se ejecuta fuera del perfil `local`.
+
+Puedes iniciar sesión desde el frontend con cualquiera de estas cuentas:
+
+| Correo | Contraseña |
+|---|---|
+| `ana.demo@rankkings.test` | `DemoRankKings123!` |
+| `mateo.demo@rankkings.test` | `DemoRankKings123!` |
+| `camila.demo@rankkings.test` | `DemoRankKings123!` |
+
+Estos usuarios y contraseñas son exclusivamente para desarrollo local; no los uses en otros entornos.
+
 ### Multimedia y reseñas en posts
 
 Las reseñas nuevas se crean como comentarios del post del Rankable Item (`POST /posts/{postId}/reviews`); `POST /posts` rechaza reseñas independientes. Las imágenes se suben a un bucket privado de Amazon S3 mediante una URL firmada: configura `MEDIA_S3_BUCKET`, `AWS_REGION` y las credenciales de AWS del proveedor estándar (variables de entorno o perfil local). No guardes credenciales en el repositorio. La configuración CORS del bucket debe permitir `PUT` desde el origen del frontend y los encabezados `Content-Type` e `If-None-Match`. Configura además una regla de ciclo de vida para borrar objetos del prefijo `pending-post-media/` después de un día; no apliques esa regla al prefijo `post-media/`.

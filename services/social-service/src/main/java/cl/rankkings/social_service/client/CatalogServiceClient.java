@@ -1,5 +1,6 @@
 package cl.rankkings.social_service.client;
 
+import cl.rankkings.social_service.dto.SocialDtos.NewRankableItemInput;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
@@ -37,6 +39,46 @@ public class CatalogServiceClient {
             request.header("X-User-Id", viewerId);
         }
         return get(request.build());
+    }
+
+    public JsonNode createItem(NewRankableItemInput input, String authorId, String postId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("category", input.category());
+        body.put("title", input.title());
+        body.put("description", input.description());
+        body.put("creator", input.creator());
+        body.put("uploadedBy", authorId);
+        body.put("year", input.year());
+        body.put("coverUrl", input.coverUrl());
+        body.put("identifiers", input.identifiers());
+        body.put("details", input.details());
+        body.put("externalLinks", input.externalLinks());
+        body.put("postId", postId);
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(catalogUrl + "/internal/items"))
+                    .timeout(Duration.ofSeconds(3))
+                    .header("X-Internal-Key", internalKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 400) {
+                String message = mapper.readTree(response.body()).path("message")
+                        .asString("Datos del Rankable Item inválidos");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+            }
+            if (response.statusCode() != 201) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo crear el Rankable Item");
+            }
+            return mapper.readTree(response.body());
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Creación del Rankable Item interrumpida");
+        } catch (Exception exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Catálogo no disponible");
+        }
     }
 
     public void updateRatingStats(String itemId, double averageRating, int ratingsCount) {

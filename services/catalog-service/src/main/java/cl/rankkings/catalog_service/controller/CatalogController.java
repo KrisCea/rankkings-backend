@@ -1,10 +1,13 @@
 package cl.rankkings.catalog_service.controller;
 
 import cl.rankkings.catalog_service.dto.CatalogDtos.RankableItemDto;
+import cl.rankkings.catalog_service.dto.CatalogDtos.CreateRankableItemInput;
 import cl.rankkings.catalog_service.dto.CatalogDtos.RatingStatsUpdateInput;
 import cl.rankkings.catalog_service.dto.CatalogDtos.SavedItemDto;
 import cl.rankkings.catalog_service.service.CatalogService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +20,7 @@ import java.util.List;
 public class CatalogController {
 
     private final CatalogService catalogService;
+    @Value("${rankkings.internal-key:}") private String internalKey;
 
     @GetMapping("/items")
     public ResponseEntity<List<RankableItemDto>> searchItems(
@@ -37,6 +41,14 @@ public class CatalogController {
             @PathVariable String itemId,
             @RequestHeader(value = "X-User-Id", required = false) String currentUserId) {
         return ResponseEntity.ok(catalogService.getChildren(itemId, currentUserId));
+    }
+
+    @PostMapping("/internal/items")
+    public ResponseEntity<RankableItemDto> createItem(
+            @Valid @RequestBody CreateRankableItemInput input,
+            @RequestHeader(value = "X-Internal-Key", required = false) String key) {
+        requireInternal(key);
+        return ResponseEntity.status(HttpStatus.CREATED).body(catalogService.createItem(input));
     }
 
     @PutMapping("/items/{itemId}/save")
@@ -73,6 +85,12 @@ public class CatalogController {
     private void requireUser(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesión requerida");
+        }
+    }
+
+    private void requireInternal(String key) {
+        if (internalKey.isBlank() || !internalKey.equals(key)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso interno requerido");
         }
     }
 }

@@ -1,6 +1,7 @@
 package cl.rankkings.catalog_service.service;
 
 import cl.rankkings.catalog_service.dto.CatalogDtos.RankableItemDto;
+import cl.rankkings.catalog_service.dto.CatalogDtos.CreateRankableItemInput;
 import cl.rankkings.catalog_service.dto.CatalogDtos.RatingStatsUpdateInput;
 import cl.rankkings.catalog_service.dto.CatalogDtos.SavedItemDto;
 import cl.rankkings.catalog_service.model.RankableItem;
@@ -9,12 +10,15 @@ import cl.rankkings.catalog_service.repository.ItemRepository;
 import cl.rankkings.catalog_service.repository.SavedItemRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -24,6 +28,43 @@ public class CatalogService {
 
     private final ItemRepository itemRepository;
     private final SavedItemRepository savedItemRepository;
+
+    @Transactional
+    public RankableItemDto createItem(CreateRankableItemInput input) {
+        validateCategoryDetails(input.category(), input.details());
+        RankableItem.CreatorEmbed creator = new RankableItem.CreatorEmbed(
+                input.creator().id() == null || input.creator().id().isBlank()
+                        ? UUID.randomUUID().toString()
+                        : input.creator().id(),
+                input.creator().name().trim(),
+                input.creator().avatarUrl(),
+                input.creator().linkedUserId(),
+                input.creator().linkedUsername()
+        );
+        List<RankableItem.ExternalLinkEmbed> externalLinks = input.externalLinks() == null
+                ? List.of()
+                : input.externalLinks().stream()
+                        .map(link -> new RankableItem.ExternalLinkEmbed(
+                                UUID.randomUUID().toString(), link.label(), link.url(), link.type()))
+                        .toList();
+
+        RankableItem item = RankableItem.builder()
+                .id(UUID.randomUUID().toString())
+                .category(input.category())
+                .title(input.title().trim())
+                .description(input.description())
+                .creator(creator)
+                .uploadedBy(input.uploadedBy())
+                .year(input.year())
+                .coverUrl(input.coverUrl() == null ? "" : input.coverUrl())
+                .identifiers(input.identifiers() == null ? Map.of() : input.identifiers())
+                .details(input.details() == null ? Map.of() : input.details())
+                .verificationStatus("unverified")
+                .postId(input.postId())
+                .externalLinks(externalLinks)
+                .build();
+        return toDto(itemRepository.save(item), false);
+    }
 
     @Transactional(readOnly = true)
     public RankableItemDto getItemById(String itemId, String currentUserId) {
@@ -147,6 +188,7 @@ public class CatalogService {
                 entity.getYear(),
                 entity.getCoverUrl(),
                 entity.getIdentifiers(),
+                entity.getDetails() == null ? Map.of() : entity.getDetails(),
                 entity.getVerificationStatus(),
                 entity.getPostId(),
                 entity.getAverageRating(),
@@ -160,5 +202,31 @@ public class CatalogService {
                 entity.getExternalLinks(),
                 entity.getCreatedAt().toString()
         );
+    }
+
+    private void validateCategoryDetails(String category, Map<String, String> details) {
+        Map<String, List<String>> requiredFields = Map.of(
+                "music", List.of("format"),
+                "podcasts", List.of("format"),
+                "books", List.of("format"),
+                "movies", List.of("format"),
+                "concerts", List.of("eventDate", "venue", "city"),
+                "videogames", List.of("platform"),
+                "art", List.of("medium"),
+                "boardgames", List.of("minPlayers", "maxPlayers", "playingTimeMinutes")
+        );
+        List<String> required = requiredFields.get(category);
+        if (required == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "category inválida");
+        }
+        Map<String, String> supplied = details == null ? Map.of() : details;
+        List<String> missing = required.stream()
+                .filter(field -> supplied.get(field) == null || supplied.get(field).isBlank())
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Faltan datos para " + category + ": " + String.join(", ", missing));
+        }
     }
 }

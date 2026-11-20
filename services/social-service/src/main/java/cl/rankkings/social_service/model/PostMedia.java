@@ -29,6 +29,9 @@ public class PostMedia {
     @Column(name = "media_type", nullable = false, length = 20)
     private String mediaType;
 
+    @Column(name = "is_cover")
+    private Boolean cover = false;
+
     @Column(name = "content_type", length = 100)
     private String contentType;
 

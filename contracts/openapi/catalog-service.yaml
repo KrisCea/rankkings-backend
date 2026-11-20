@@ -91,6 +91,38 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+  /internal/items:
+    post:
+      tags: [Items]
+      operationId: createRankableItem
+      summary: Crear una obra desde un servicio interno
+      description: >-
+        Asigna automáticamente el ID interno. Los identificadores externos,
+        la portada y los enlaces son opcionales. details debe contener los
+        datos requeridos para la categoría seleccionada.
+      parameters:
+        - $ref: "#/components/parameters/InternalKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRankableItemInput"
+      responses:
+        "201":
+          description: Obra creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankableItem"
+        "400":
+          description: Datos de la obra inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Acceso interno denegado.
 components:
   securitySchemes:
     SessionCookie:
@@ -103,6 +135,12 @@ components:
       bearerFormat: JWT
       description: Alternativa para herramientas no navegador, si está habilitada.
   parameters:
+    InternalKey:
+      name: X-Internal-Key
+      in: header
+      required: true
+      schema:
+        type: string
     ItemId:
       name: itemId
       in: path
@@ -161,6 +199,86 @@ components:
         type:
           type: string
           enum: [streaming, store, social, other]
+    CreateRankableItemInput:
+      type: object
+      additionalProperties: false
+      required: [category, title, creator, uploadedBy, postId]
+      properties:
+        category:
+          $ref: "#/components/schemas/CategoryId"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        creator:
+          $ref: "#/components/schemas/CreatorInput"
+        uploadedBy:
+          type: string
+        year:
+          type: integer
+        coverUrl:
+          type: string
+          maxLength: 2048
+          description: Opcional; puede omitirse y cargarse una portada como imagen del post.
+        identifiers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Identificadores externos opcionales, por ejemplo ISBN, ISRC o UPC.
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            Campos requeridos por categoría: music/podcasts/books/movies requieren format;
+            concerts requiere eventDate, venue y city; videogames requiere platform;
+            art requiere medium; boardgames requiere minPlayers, maxPlayers y playingTimeMinutes.
+        externalLinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewExternalLink"
+        postId:
+          type: string
+          description: ID de la publicación creada por el servicio social.
+    CreatorInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        id:
+          type: string
+          description: Opcional; si se omite, se genera un ID de creador.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        avatarUrl:
+          type: string
+          maxLength: 2048
+        linkedUserId:
+          type: string
+        linkedUsername:
+          type: string
+    NewExternalLink:
+      type: object
+      additionalProperties: false
+      required: [label, url, type]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        type:
+          type: string
+          minLength: 1
+          maxLength: 20
     RankableItem:
       type: object
       additionalProperties: false
@@ -170,8 +288,8 @@ components:
         - title
         - creator
         - uploadedBy
-        - coverUrl
         - identifiers
+        - details
         - verificationStatus
         - postId
         - averageRating
@@ -198,8 +316,12 @@ components:
           type: integer
         coverUrl:
           type: string
-          format: uri
+          description: URL de portada; puede estar vacío si la portada se subió como imagen del post.
         identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        details:
           type: object
           additionalProperties:
             type: string

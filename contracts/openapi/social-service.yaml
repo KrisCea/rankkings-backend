@@ -42,7 +42,12 @@ paths:
     post:
       tags: [Posts]
       operationId: createPost
-      summary: Publicar un Rankable Item existente
+      summary: Crear un Rankable Item y su publicación, o publicar uno existente
+      description: >-
+        Para crear una obra nueva envía rankableItem y omite itemId. Para usar
+        una obra existente envía itemId y omite rankableItem. coverUrl,
+        identifiers y externalLinks son opcionales. Se puede cargar una portada
+        después de crear el post mediante el endpoint de carga de imágenes.
       security:
         - SessionCookie: []
       requestBody:
@@ -662,8 +667,8 @@ components:
         - title
         - creator
         - uploadedBy
-        - coverUrl
         - identifiers
+        - details
         - verificationStatus
         - postId
         - averageRating
@@ -690,8 +695,12 @@ components:
           type: integer
         coverUrl:
           type: string
-          format: uri
+          description: URL de portada; puede estar vacío si la portada se subió como imagen del post.
         identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        details:
           type: object
           additionalProperties:
             type: string
@@ -730,7 +739,7 @@ components:
     PostMedia:
       type: object
       additionalProperties: false
-      required: [id, url, type]
+      required: [id, url, type, isCover]
       properties:
         id:
           type: string
@@ -740,6 +749,9 @@ components:
         type:
           type: string
           enum: [image, video, external]
+        isCover:
+          type: boolean
+          description: Indica si la imagen se almacena como portada del Rankable Item.
         thumbnailUrl:
           type: string
           format: uri
@@ -871,17 +883,103 @@ components:
     NewPostInput:
       type: object
       additionalProperties: false
-      required: [itemId, kind, caption]
+      required: [kind, caption]
+      oneOf:
+        - required: [itemId]
+          not:
+            required: [rankableItem]
+        - required: [rankableItem]
+          not:
+            required: [itemId]
       properties:
         itemId:
           type: string
           minLength: 1
+          description: Obra existente; no se envía junto con rankableItem.
+        rankableItem:
+          $ref: "#/components/schemas/NewRankableItemInput"
         kind:
           type: string
           enum: [item]
         caption:
           type: string
           maxLength: 2000
+    NewRankableItemInput:
+      type: object
+      additionalProperties: false
+      required: [category, title, creator]
+      properties:
+        category:
+          type: string
+          enum: [music, podcasts, books, movies, concerts, videogames, art, boardgames]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        creator:
+          $ref: "#/components/schemas/NewCreatorInput"
+        year:
+          type: integer
+        coverUrl:
+          type: string
+          maxLength: 2048
+          description: Opcional. También se puede cargar una portada a S3 después de crear el post.
+        identifiers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Identificadores externos opcionales, como ISBN, ISRC o UPC.
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            Campos requeridos por categoría: music/podcasts/books/movies requieren format;
+            concerts requiere eventDate, venue y city; videogames requiere platform;
+            art requiere medium; boardgames requiere minPlayers, maxPlayers y playingTimeMinutes.
+        externalLinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewExternalLinkInput"
+    NewCreatorInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        id:
+          type: string
+          description: Opcional; el catálogo genera uno si se omite.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        avatarUrl:
+          type: string
+          maxLength: 2048
+        linkedUserId:
+          type: string
+        linkedUsername:
+          type: string
+    NewExternalLinkInput:
+      type: object
+      additionalProperties: false
+      required: [label, url, type]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        type:
+          type: string
+          minLength: 1
+          maxLength: 20
     NewReviewInput:
       type: object
       additionalProperties: false
@@ -908,6 +1006,9 @@ components:
           type: integer
           minimum: 1
           maximum: 10485760
+        isCover:
+          type: boolean
+          default: false
     ImageUploadUrl:
       type: object
       additionalProperties: false

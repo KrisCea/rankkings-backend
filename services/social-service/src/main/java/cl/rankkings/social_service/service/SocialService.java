@@ -97,16 +97,29 @@ public class SocialService {
         if ("review".equals(input.kind())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Crea la reseña como comentario del post del ítem");
         }
+        boolean creatingItem = input.rankableItem() != null;
+        if (creatingItem == (input.itemId() != null && !input.itemId().isBlank())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Indica un itemId existente o los datos de rankableItem, pero no ambos");
+        }
 
-        JsonNode item = catalogClient.getItem(input.itemId(), null);
-        if ("item".equals(input.kind()) && posts.existsByItemIdAndKind(input.itemId(), "item")) {
+        String postId = UUID.randomUUID().toString();
+        JsonNode item = creatingItem
+                ? catalogClient.createItem(input.rankableItem(), authorId, postId)
+                : catalogClient.getItem(input.itemId(), null);
+        String itemId = key(item, "id");
+        if (itemId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "El catálogo no devolvió el ID del Rankable Item");
+        }
+        if ("item".equals(input.kind()) && posts.existsByItemIdAndKind(itemId, "item")) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Este ítem ya tiene publicación");
         }
 
         String catalogPostId = key(item, "postId");
-        String postId = "item".equals(input.kind()) && !catalogPostId.isBlank()
-                ? catalogPostId
-                : UUID.randomUUID().toString();
+        if (!creatingItem && "item".equals(input.kind()) && !catalogPostId.isBlank()) {
+            postId = catalogPostId;
+        }
         if (posts.existsById(postId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "ID de publicación ocupado");
         }
@@ -114,7 +127,7 @@ public class SocialService {
         SocialPost post = new SocialPost();
         post.setId(postId);
         post.setAuthorId(authorId);
-        post.setItemId(input.itemId());
+        post.setItemId(itemId);
         post.setKind(input.kind());
         post.setCaption(input.caption() == null ? "" : input.caption().trim());
         posts.save(post);
@@ -290,7 +303,12 @@ public class SocialService {
         List<Map<String, Object>> mediaItems = new java.util.ArrayList<>();
         String cover = key(item, "coverUrl");
         if (!cover.isBlank()) {
-            mediaItems.add(Map.of("id", post.getId() + "-cover", "url", cover, "type", "image"));
+            mediaItems.add(Map.of(
+                    "id", post.getId() + "-cover",
+                    "url", cover,
+                    "type", "image",
+                    "isCover", true
+            ));
         }
         mediaItems.addAll(postMediaService.mediaForPost(post.getId()));
         result.put("media", mediaItems);

@@ -53,6 +53,11 @@ public class RankableItem {
     @Builder.Default
     private Map<String, String> identifiers = new HashMap<>();
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column
+    @Builder.Default
+    private Map<String, String> details = new HashMap<>();
+
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String verificationStatus = "unverified";

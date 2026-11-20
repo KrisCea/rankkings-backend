@@ -50,6 +50,13 @@ public class PostMediaService {
         attachment.setPostId(post.getId());
         attachment.setOwnerId(viewerId);
         attachment.setMediaType("image");
+        attachment.setCover(input.isCover());
+        if (input.isCover()) {
+            media.findByPostIdAndCoverTrue(postId).forEach(existingCover -> {
+                existingCover.setCover(false);
+                media.save(existingCover);
+            });
+        }
         attachment.setContentType(input.contentType());
         attachment.setSizeBytes(input.sizeBytes());
         attachment.setObjectKey(objectKey);
@@ -143,6 +150,7 @@ public class PostMediaService {
                             ? attachment.getExternalUrl()
                             : storage.presignRead(attachment.getObjectKey()));
                     result.put("type", attachment.getMediaType());
+                    result.put("isCover", Boolean.TRUE.equals(attachment.getCover()));
                     return result;
                 })
                 .toList();

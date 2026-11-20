@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface PostMediaRepository extends JpaRepository<PostMedia, String> {
     List<PostMedia> findByPostIdOrderByCreatedAtAsc(String postId);
     List<PostMedia> findByPostIdAndStatusOrderByCreatedAtAsc(String postId, String status);
+    List<PostMedia> findByPostIdAndCoverTrue(String postId);
     Optional<PostMedia> findByIdAndPostId(String id, String postId);
     long countByPostId(String postId);
 }
