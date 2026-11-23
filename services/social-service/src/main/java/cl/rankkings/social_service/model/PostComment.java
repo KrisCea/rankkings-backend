@@ -12,5 +12,11 @@ public class PostComment {
     private String parentId;
     private String replyToUsername;
     @Column(nullable=false,length=2000) private String text;
+    @Column(name="author_score") private Double authorScore;
+    @Column(name="deleted_at") private Instant deletedAt;
+    @Column(name="moderation_status", nullable=false, length=20, columnDefinition="varchar(20) default 'approved'") private String moderationStatus="approved";
+    @Column(name="moderated_at") private Instant moderatedAt;
+    @Column(name="moderated_by") private String moderatedBy;
+    @Column(name="moderation_reason", length=1000) private String moderationReason;
     @Column(nullable=false) private Instant createdAt=Instant.now();
 }

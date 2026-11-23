@@ -12,5 +12,8 @@ public class SocialPost {
     @Column(nullable=false,length=2000) private String caption="";
     private Double reviewScore;
     @Column(nullable=false) private String moderationStatus="approved";
+    @Column(name="moderated_at") private Instant moderatedAt;
+    @Column(name="moderated_by") private String moderatedBy;
+    @Column(name="moderation_reason", length=1000) private String moderationReason;
     @Column(nullable=false) private Instant createdAt=Instant.now();
 }

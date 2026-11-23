@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.Instant;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest @Transactional
@@ -30,7 +31,22 @@ class SocialPersistenceTest {
         review.setAuthorId("user-demo");
         review.setKind("review");
         review.setText("Reseña como comentario");
+        review.setAuthorScore(8.5);
         comments.saveAndFlush(review);
         assertEquals("review", comments.findById(review.getId()).orElseThrow().getKind());
+        assertEquals(8.5, comments.findById(review.getId()).orElseThrow().getAuthorScore());
+        review.setDeletedAt(Instant.now());
+        comments.saveAndFlush(review);
+        assertTrue(comments.findByIdAndDeletedAtIsNull(review.getId()).isEmpty());
+
+        PostComment unscoredReview = new PostComment();
+        unscoredReview.setId(UUID.randomUUID().toString());
+        unscoredReview.setPostId(p.getId());
+        unscoredReview.setAuthorId("user-demo");
+        unscoredReview.setKind("review");
+        unscoredReview.setText("Reseña sin puntuación");
+        comments.saveAndFlush(unscoredReview);
+        assertNull(comments.findById(unscoredReview.getId()).orElseThrow().getAuthorScore());
+        assertEquals(1, comments.countByPostIdAndDeletedAtIsNull(p.getId()));
     }
 }

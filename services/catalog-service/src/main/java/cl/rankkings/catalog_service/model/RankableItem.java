@@ -45,7 +45,7 @@ public class RankableItem {
     @Column(name = "release_year")
     private Integer year;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 2048)
     private String coverUrl;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -61,6 +61,15 @@ public class RankableItem {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String verificationStatus = "unverified";
+
+    @Column(
+            name = "moderation_status",
+            nullable = false,
+            length = 20,
+            columnDefinition = "varchar(20) default 'approved'"
+    )
+    @Builder.Default
+    private String moderationStatus = "approved";
 
     @Column(nullable = false)
     private String postId;

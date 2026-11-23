@@ -1,6 +1,15 @@
 server:
   address: ${SERVICE_BIND_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8081}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
 spring:
   application:
     name: identity-service
@@ -12,6 +21,8 @@ spring:
     hibernate:
       ddl-auto: update # desarrollo; usar migraciones en producción
     open-in-view: false
+  flyway:
+    enabled: false
 rankkings:
   internal-key: ${INTERNAL_SERVICE_KEY:}
   cookie-secure: ${COOKIE_SECURE:false}
@@ -39,11 +50,14 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:${IDENTITY_DB_URL}}
+    username: ${SPRING_DATASOURCE_USERNAME:${IDENTITY_DB_USER}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${IDENTITY_DB_PASSWORD}}
   jpa:
     hibernate:
       ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 rankkings:
   verify-url: ${VERIFICATION_URL:}

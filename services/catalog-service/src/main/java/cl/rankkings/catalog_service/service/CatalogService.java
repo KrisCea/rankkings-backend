@@ -3,6 +3,8 @@ package cl.rankkings.catalog_service.service;
 import cl.rankkings.catalog_service.dto.CatalogDtos.RankableItemDto;
 import cl.rankkings.catalog_service.dto.CatalogDtos.CreateRankableItemInput;
 import cl.rankkings.catalog_service.dto.CatalogDtos.RatingStatsUpdateInput;
+import cl.rankkings.catalog_service.dto.CatalogDtos.ItemCoverUpdateInput;
+import cl.rankkings.catalog_service.dto.CatalogDtos.ItemModerationUpdateInput;
 import cl.rankkings.catalog_service.dto.CatalogDtos.SavedItemDto;
 import cl.rankkings.catalog_service.model.RankableItem;
 import cl.rankkings.catalog_service.model.SavedItem;
@@ -60,6 +62,7 @@ public class CatalogService {
                 .identifiers(input.identifiers() == null ? Map.of() : input.identifiers())
                 .details(input.details() == null ? Map.of() : input.details())
                 .verificationStatus("unverified")
+                .moderationStatus("approved")
                 .postId(input.postId())
                 .externalLinks(externalLinks)
                 .build();
@@ -68,15 +71,34 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public RankableItemDto getItemById(String itemId, String currentUserId) {
+        return getItemById(itemId, currentUserId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public RankableItemDto getItemById(String itemId, String currentUserId, String currentUserRole) {
         RankableItem item = findEntityOrThrow(itemId);
+        requireVisible(item, currentUserId, currentUserRole);
         boolean saved = currentUserId != null && savedItemRepository.existsByUserIdAndItemId(currentUserId, itemId);
         return toDto(item, saved);
     }
 
     @Transactional(readOnly = true)
+    public RankableItemDto getItemInternal(String itemId) {
+        return toDto(findEntityOrThrow(itemId), false);
+    }
+
+    @Transactional(readOnly = true)
     public List<RankableItemDto> searchItems(String query, String currentUserId) {
+        return searchItems(query, currentUserId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankableItemDto> searchItems(String query, String currentUserId, String currentUserRole) {
         List<RankableItem> items = itemRepository.findAllByTitleContainingIgnoreCaseOrderByTitleAsc(
                 query == null ? "" : query.trim());
+        items = items.stream()
+                .filter(item -> canView(item, currentUserId, currentUserRole))
+                .toList();
         if (items.isEmpty()) {
             return List.of();
         }
@@ -93,11 +115,20 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public List<RankableItemDto> getChildren(String parentId, String currentUserId) {
+        return getChildren(parentId, currentUserId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankableItemDto> getChildren(String parentId, String currentUserId, String currentUserRole) {
         if (!itemRepository.existsById(parentId)) {
             throw new EntityNotFoundException("Obra padre no encontrada: " + parentId);
         }
 
-        List<RankableItem> children = itemRepository.findByParentIdOrderByPositionAsc(parentId);
+        RankableItem parent = findEntityOrThrow(parentId);
+        requireVisible(parent, currentUserId, currentUserRole);
+        List<RankableItem> children = itemRepository.findByParentIdOrderByPositionAsc(parentId).stream()
+                .filter(item -> canView(item, currentUserId, currentUserRole))
+                .toList();
         if (children.isEmpty()) {
             return List.of();
         }
@@ -114,6 +145,9 @@ public class CatalogService {
     @Transactional
     public RankableItemDto saveItem(String itemId, String userId) {
         RankableItem item = findEntityOrThrow(itemId);
+        if (!"approved".equals(item.getModerationStatus())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Obra no encontrada");
+        }
         if (!savedItemRepository.existsByUserIdAndItemId(userId, itemId)) {
             savedItemRepository.save(SavedItem.builder()
                     .userId(userId)
@@ -149,6 +183,7 @@ public class CatalogService {
 
         return savedList.stream()
                 .filter(saved -> itemsMap.containsKey(saved.getItemId()))
+                .filter(saved -> canView(itemsMap.get(saved.getItemId()), userId, null))
                 .map(saved -> new SavedItemDto(
                         toDto(itemsMap.get(saved.getItemId()), true),
                         saved.getSavedAt().toString()
@@ -172,9 +207,52 @@ public class CatalogService {
         }
     }
 
+    @Transactional
+    public void updateItemCover(String itemId, ItemCoverUpdateInput input) {
+        RankableItem item = findEntityOrThrow(itemId);
+        if (!item.getPostId().equals(input.postId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La obra no pertenece a esta publicación");
+        }
+        item.setCoverUrl(input.coverUrl());
+        itemRepository.save(item);
+    }
+
+    @Transactional
+    public void updateItemModerationStatus(String itemId, ItemModerationUpdateInput input) {
+        RankableItem item = findEntityOrThrow(itemId);
+        if (!item.getPostId().equals(input.postId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La obra no pertenece a esta publicación");
+        }
+        if (!List.of("pending", "approved", "rejected").contains(input.status())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de moderación inválido");
+        }
+        item.setModerationStatus(input.status());
+        itemRepository.save(item);
+    }
+
+    @Transactional
+    public void deleteCreatedItemByPostId(String postId) {
+        itemRepository.findFirstByPostId(postId).ifPresent(item -> {
+            savedItemRepository.deleteByItemId(item.getId());
+            itemRepository.delete(item);
+        });
+    }
+
     private RankableItem findEntityOrThrow(String itemId) {
         return itemRepository.findById(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("Obra no encontrada: " + itemId));
+    }
+
+    private void requireVisible(RankableItem item, String currentUserId, String currentUserRole) {
+        if (!canView(item, currentUserId, currentUserRole)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Obra no encontrada");
+        }
+    }
+
+    private boolean canView(RankableItem item, String currentUserId, String currentUserRole) {
+        return "approved".equals(item.getModerationStatus())
+                || "admin".equals(currentUserRole)
+                || (currentUserId != null && currentUserId.equals(item.getUploadedBy()));
     }
 
     private RankableItemDto toDto(RankableItem entity, boolean savedByCurrentUser) {
@@ -218,6 +296,9 @@ public class CatalogService {
         List<String> required = requiredFields.get(category);
         if (required == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "category inválida");
+        }
+        if (details == null || details.isEmpty()) {
+            return;
         }
         Map<String, String> supplied = details == null ? Map.of() : details;
         List<String> missing = required.stream()

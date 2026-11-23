@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ItemRepository extends JpaRepository<RankableItem, String> {
@@ -14,6 +15,14 @@ public interface ItemRepository extends JpaRepository<RankableItem, String> {
     List<RankableItem> findByParentIdOrderByPositionAsc(String parentId);
 
     List<RankableItem> findAllByTitleContainingIgnoreCaseOrderByTitleAsc(String title);
+    List<RankableItem> findAllByTitleContainingIgnoreCaseAndModerationStatusOrderByTitleAsc(
+            String title,
+            String moderationStatus
+    );
+
+    List<RankableItem> findByParentIdAndModerationStatusOrderByPositionAsc(String parentId, String moderationStatus);
+
+    Optional<RankableItem> findFirstByPostId(String postId);
 
     @Query("SELECT AVG(i.averageRating) FROM RankableItem i WHERE i.parentId = :parentId AND i.ratingsCount > 0")
     Double calculateChildrenAverageRating(@Param("parentId") String parentId);

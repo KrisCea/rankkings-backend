@@ -47,6 +47,19 @@ public class PostMedia {
     @Column(nullable = false, length = 20)
     private String status;
 
+    @Column(name = "moderation_status", nullable = false, length = 20,
+            columnDefinition = "varchar(20) default 'approved'")
+    private String moderationStatus = "approved";
+
+    @Column(name = "moderated_at")
+    private Instant moderatedAt;
+
+    @Column(name = "moderated_by")
+    private String moderatedBy;
+
+    @Column(name = "moderation_reason", length = 1000)
+    private String moderationReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 }

@@ -69,6 +69,7 @@ class CatalogServiceApplicationTests {
 		Assertions.assertEquals(Map.of("format", "novel"), item.details());
 		Assertions.assertEquals(java.util.List.of(), item.externalLinks());
 		Assertions.assertEquals("unverified", item.verificationStatus());
+		Assertions.assertEquals("approved", itemRepository.findById(item.id()).orElseThrow().getModerationStatus());
 	}
 
 	@Test
@@ -91,6 +92,69 @@ class CatalogServiceApplicationTests {
 				org.springframework.web.server.ResponseStatusException.class,
 				() -> catalogService.createItem(input)
 		);
+	}
+
+	@Test
+	@Transactional
+	void createsRankableItemsWhenOptionalDetailsAreOmitted() {
+		var item = catalogService.createItem(new CreateRankableItemInput(
+				"music",
+				"Track",
+				null,
+				new CreatorInput(null, "Artist", null, null, null),
+				null,
+				null,
+				Map.of(),
+				null,
+				null,
+				"user-1",
+				"post-2"
+		));
+
+		Assertions.assertEquals(Map.of(), item.details());
+	}
+
+	@Test
+	@Transactional
+	void persistsLongCoverUrls() {
+		String coverUrl = "https://example.com/" + "a".repeat(500);
+		var item = catalogService.createItem(new CreateRankableItemInput(
+				"music",
+				"Track with long cover URL",
+				null,
+				new CreatorInput(null, "Artist", null, null, null),
+				null,
+				coverUrl,
+				Map.of(),
+				Map.of(),
+				null,
+				"user-1",
+				"post-long-cover-url"
+		));
+
+		Assertions.assertEquals(coverUrl, itemRepository.findById(item.id()).orElseThrow().getCoverUrl());
+	}
+
+	@Test
+	@Transactional
+	void removesAnUnpublishedItemByItsPostId() {
+		var item = catalogService.createItem(new CreateRankableItemInput(
+				"music",
+				"Track",
+				null,
+				new CreatorInput(null, "Artist", null, null, null),
+				null,
+				null,
+				Map.of(),
+				Map.of(),
+				null,
+				"user-1",
+				"post-to-compensate"
+		));
+
+		catalogService.deleteCreatedItemByPostId("post-to-compensate");
+
+		Assertions.assertFalse(itemRepository.existsById(item.id()));
 	}
 
 }

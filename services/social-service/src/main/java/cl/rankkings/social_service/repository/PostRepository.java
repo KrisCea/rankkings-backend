@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<SocialPost, String> {
     List<SocialPost> findAllByOrderByCreatedAtDesc();
+    List<SocialPost> findByModerationStatusOrderByCreatedAtDesc(String moderationStatus);
     List<SocialPost> findByAuthorIdAndKindOrderByCreatedAtDesc(String authorId, String kind);
     List<SocialPost> findByItemIdAndKindOrderByCreatedAtDesc(String itemId, String kind);
     Optional<SocialPost> findFirstByItemIdAndKindOrderByCreatedAtAsc(String itemId, String kind);

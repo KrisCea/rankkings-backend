@@ -20,12 +20,12 @@ public class SessionGatewayFilter implements GlobalFilter, Ordered {
     @Value("${rankkings.identity-url:http://localhost:8081}") private String identityUrl;
     @Value("${rankkings.internal-key:}") private String internalKey;
     @Value("${rankkings.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") private String allowedOrigins;
-    public record Principal(String id,String username,String displayName,String avatarUrl,String accountType,boolean isVerifiedBusiness) {}
+    public record Principal(String id,String username,String displayName,String avatarUrl,String accountType,boolean isVerifiedBusiness,String role) {}
     @Override public int getOrder(){return -100;}
 
     @Override public Mono<Void> filter(ServerWebExchange exchange,GatewayFilterChain chain){
         ServerHttpRequest clean=exchange.getRequest().mutate().headers(h->{
-            h.remove("X-User-Id");h.remove("X-Username");h.remove("X-Internal-Key");
+            h.remove("X-User-Id");h.remove("X-Username");h.remove("X-User-Role");h.remove("X-Internal-Key");
             if(!internalKey.isBlank())h.set("X-Internal-Key",internalKey);
         }).build();
         ServerWebExchange next=exchange.mutate().request(clean).build();
@@ -44,6 +44,7 @@ public class SessionGatewayFilter implements GlobalFilter, Ordered {
              .map(principal -> {
                  ServerHttpRequest authenticated=clean.mutate().headers(h->{
                      h.set("X-User-Id",principal.id());h.set("X-Username",principal.username());
+                     if(principal.role()!=null)h.set("X-User-Role",principal.role());
                  }).build();
                  return exchange.mutate().request(authenticated).build();
              })

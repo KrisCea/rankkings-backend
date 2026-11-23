@@ -16,6 +16,15 @@ java -version
 $env:JAVA_HOME
 ```
 
+No necesitas instalar Maven globalmente. Para compilar solo Catálogo desde la raíz:
+
+```powershell
+.\services\catalog-service\mvnw.cmd -f .\services\catalog-service\pom.xml compile
+```
+
+Desde la carpeta del servicio también puedes ejecutar `.\mvnw.cmd compile`. Evita
+`mvn compile` si Maven no está instalado; el entorno local ya usa Maven Wrapper.
+
 ## Iniciar el entorno local
 
 Desde la raíz de este repositorio, ejecuta:
@@ -34,6 +43,18 @@ El script abre una ventana de PowerShell por servicio. Déjalas abiertas mientra
 | Social | `http://localhost:8083` | 8083 |
 
 El script activa el perfil `local`, genera una clave interna aleatoria compartida y habilita el bypass de captcha y el registro local del enlace de verificación. Son opciones exclusivas para desarrollo. En Identity, el enlace de verificación aparece en la consola; no publiques estas opciones ni expongas directamente los puertos de los servicios.
+
+## Roles y permisos
+
+El acceso se aplica en el backend; ocultar acciones en el frontend no reemplaza estas validaciones:
+
+| Estado/rol | Permisos |
+|---|---|
+| Visitante sin sesión | Puede consultar el feed, las publicaciones, los perfiles públicos y el catálogo. No puede seguir, guardar, votar, puntuar, comentar, reseñar, compartir, crear contenido ni borrarlo. |
+| `user` | Puede participar, crear contenido y administrar sus propios elementos guardados. Puede borrar su propio contenido donde existe un endpoint de borrado; la edición de publicaciones/comentarios aún no está expuesta por la API. |
+| `admin` | Puede moderar contenido de cualquier autor, incluida la eliminación de publicaciones, reseñas, comentarios y adjuntos. |
+
+`GET /api/users/me` devuelve `role` (`user` o `admin`) para que el frontend presente las opciones correspondientes. El rol se verifica en el servidor y no se acepta desde el navegador. El registro público siempre crea cuentas `user`; la asignación de `admin` es una operación confiable de administración, no existe una opción de autoelevación. La interfaz del panel administrativo pertenece al repositorio frontend y debe consumir este rol.
 
 ## Arquitectura
 
@@ -110,7 +131,7 @@ Estos usuarios y contraseñas son exclusivamente para desarrollo local; no los u
 
 Las reseñas nuevas se crean como comentarios del post del Rankable Item (`POST /posts/{postId}/reviews`); `POST /posts` rechaza reseñas independientes. Las imágenes se suben a un bucket privado de Amazon S3 mediante una URL firmada: configura `MEDIA_S3_BUCKET`, `AWS_REGION` y las credenciales de AWS del proveedor estándar (variables de entorno o perfil local). No guardes credenciales en el repositorio. La configuración CORS del bucket debe permitir `PUT` desde el origen del frontend y los encabezados `Content-Type` e `If-None-Match`. Configura además una regla de ciclo de vida para borrar objetos del prefijo `pending-post-media/` después de un día; no apliques esa regla al prefijo `post-media/`.
 
-Límites iniciales: hasta cuatro adjuntos y 20 MiB por post; cada imagen puede pesar hasta 10 MiB y debe ser JPEG, PNG o WebP. La URL de subida vence en cinco minutos; después de subir el archivo se debe llamar al endpoint de confirmación, que verifica tamaño, MIME y firma del archivo. Los posts devuelven URLs firmadas de lectura que vencen en diez minutos. Los binarios quedan en S3 y sus metadatos en la base configurada para Social (H2 en desarrollo o la base indicada para el entorno); esto no configura una base AWS administrada. Los videos por ahora solo se admiten como enlaces HTTPS externos, no se suben hasta poder validar su duración y moderarlos. El backend no descarga ni incrusta esos enlaces, y aún no aplica moderación de contenido a las imágenes.
+Límites iniciales: hasta cuatro adjuntos y 20 MiB por post; cada imagen puede pesar hasta 10 MiB y debe ser JPEG, PNG o WebP. La URL de subida vence en cinco minutos; después de subir el archivo se debe llamar al endpoint de confirmación, que verifica tamaño, MIME y firma del archivo. Los posts devuelven URLs firmadas de lectura que vencen en diez minutos. El `coverUrl` persistido en el catálogo para una portada subida es una ruta estable de la API; al solicitarla, Social redirige a una URL firmada de lectura vigente. Los binarios quedan en S3 y sus metadatos en la base configurada para Social (H2 en desarrollo o la base indicada para el entorno); esto no configura una base AWS administrada. Los videos por ahora solo se admiten como enlaces HTTPS externos, no se suben hasta poder validar su duración y moderarlos. El backend no descarga ni incrusta esos enlaces, y aún no aplica moderación de contenido a las imágenes.
 
 ## Ejecutar las pruebas automatizadas
 
@@ -152,6 +173,16 @@ PostgreSQL queda disponible en `localhost:5432` (base y usuario `rankkings`) y M
 Esta configuración levanta solo las bases: los servicios siguen usando H2 con el perfil `local` y todavía no se conectan a MongoDB. La integración de los servicios con PostgreSQL/MongoDB y las pruebas Testcontainers indicadas en el ERS quedan para una etapa posterior.
 
 Para configurar envío real de verificación de correo se requieren `RESEND_API_KEY` y `VERIFICATION_FROM_EMAIL`. Consulta [docs/IDENTITY_SOCIAL_IMPLEMENTADOS.md](docs/IDENTITY_SOCIAL_IMPLEMENTADOS.md) para más detalles de configuración, contratos y limitaciones.
+
+## Preparación para AWS
+
+El backend incluye Dockerfiles, health checks, migraciones Flyway y una configuración Compose previa a AWS. Consulta [docs/AWS_DEPLOYMENT_PREPARATION.md](docs/AWS_DEPLOYMENT_PREPARATION.md) antes de desplegar.
+
+Construir las imágenes sin credenciales AWS:
+
+```powershell
+.\scripts\build-images.ps1
+```
 
 ## Seguridad y límites
 

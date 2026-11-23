@@ -3,6 +3,9 @@ info:
   title: RankKings Social Service API
   version: 1.0.0
   description: >-
+    Lectura pública para visitantes sin sesión; las acciones de participación
+    requieren autenticación. Los usuarios con role=user administran su contenido
+    y los usuarios con role=admin pueden moderar contenido de cualquier autor.
     Feed, publicaciones, interacciones y comentarios. Las reseñas son comentarios
     del post de un Rankable Item, no publicaciones independientes. El gateway reenvía también
     /users/{username}/posts y /items/{itemId}/reviews a este servicio antes de
@@ -48,6 +51,9 @@ paths:
         una obra existente envía itemId y omite rankableItem. coverUrl,
         identifiers y externalLinks son opcionales. Se puede cargar una portada
         después de crear el post mediante el endpoint de carga de imágenes.
+        El post y la obra se publican inmediatamente; la obra comienza con
+        verificationStatus=unverified hasta que se verifique. La verificación
+        no bloquea la publicación ni la visibilidad del post.
       security:
         - SessionCookie: []
       requestBody:
@@ -111,6 +117,25 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+    delete:
+      tags: [Posts]
+      operationId: deletePost
+      summary: Eliminar una publicación y su Rankable Item asociado
+      description: Solo el autor de la publicación o un usuario con role=admin puede eliminarla. También se eliminan sus interacciones y adjuntos.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "204":
+          description: Publicación y obra asociada eliminadas.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: El usuario no es autor ni administrador.
+        "404":
+          $ref: "#/components/responses/NotFound"
   /posts/by-item/{itemId}:
     get:
       tags: [Posts]
@@ -219,6 +244,32 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+  /posts/{postId}/reviews/{reviewId}:
+    delete:
+      tags: [Comments]
+      operationId: deleteReview
+      summary: Eliminar una reseña y retirar su puntuación
+      description: La reseña queda marcada como eliminada; solo su autor o un usuario con role=admin puede eliminarla.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "204":
+          description: Reseña eliminada y agregados de puntuación actualizados.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: El usuario no es autor de la reseña ni administrador.
+        "404":
+          $ref: "#/components/responses/NotFound"
   /posts/{postId}/media/uploads:
     post:
       tags: [Posts]
@@ -273,7 +324,11 @@ paths:
             type: string
       responses:
         "200":
-          description: Imagen confirmada y visible en el post.
+          description: Imagen confirmada; devuelve el Post actualizado, incluida la portada vigente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -284,6 +339,29 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: La carga aún no está disponible o ya fue confirmada.
+  /posts/{postId}/media/{mediaId}/content:
+    get:
+      tags: [Posts]
+      operationId: getPostMediaContent
+      summary: Redirigir a una URL firmada vigente para una imagen del post
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+        - name: mediaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirige a la URL temporal de lectura de la imagen.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+        "404":
+          $ref: "#/components/responses/NotFound"
   /posts/{postId}/media/external:
     post:
       tags: [Posts]
@@ -317,6 +395,7 @@ paths:
       tags: [Posts]
       operationId: deletePostMedia
       summary: Quitar un adjunto del post
+      description: El autor del post o un usuario con role=admin puede quitar el adjunto.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -333,7 +412,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: El usuario no es autor del post.
+          description: El usuario no es autor del post ni administrador.
         "404":
           $ref: "#/components/responses/NotFound"
   /posts/{postId}/vote:
@@ -539,6 +618,138 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+  /comments/{commentId}:
+    delete:
+      tags: [Comments]
+      operationId: deleteComment
+      summary: Marcar un comentario como eliminado
+      description: Solo el autor del comentario o un usuario con role=admin puede eliminarlo. El comentario se conserva como marcador para mantener las respuestas.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "204":
+          description: Comentario marcado como eliminado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: El usuario no es autor del comentario ni administrador.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/moderation:
+    get:
+      tags: [Moderation]
+      operationId: getModerationQueue
+      summary: Listar contenido pendiente de moderación
+      description: Solo disponible para usuarios autenticados con role=admin. El cursor es opaco y la cola combina posts, reseñas, comentarios y adjuntos.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ModerationStatus"
+          default: pending
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, post, review, comment, media]
+          default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Página de contenido ordenada por fecha de envío descendente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationQueuePage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Se requiere rol admin.
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /admin/moderation/{type}/{id}/approve:
+    post:
+      tags: [Moderation]
+      operationId: approveModerationItem
+      summary: Aprobar contenido pendiente
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ModerationType"
+        - $ref: "#/components/parameters/ModerationId"
+      responses:
+        "200":
+          description: Decisión de moderación aplicada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationDecision"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Se requiere rol admin.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: El contenido ya no está pendiente o el adjunto no está listo.
+  /admin/moderation/{type}/{id}/reject:
+    post:
+      tags: [Moderation]
+      operationId: rejectModerationItem
+      summary: Rechazar contenido pendiente
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ModerationType"
+        - $ref: "#/components/parameters/ModerationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRejectionInput"
+      responses:
+        "200":
+          description: Decisión de moderación aplicada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationDecision"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Se requiere rol admin.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: El contenido ya no está pendiente o el adjunto no está listo.
 components:
   securitySchemes:
     SessionCookie:
@@ -573,6 +784,20 @@ components:
         type: string
         minLength: 1
         maxLength: 30
+    ModerationType:
+      name: type
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [post, review, comment, media]
+    ModerationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
   responses:
     BadRequest:
       description: Solicitud inválida.
@@ -608,6 +833,180 @@ components:
     ModerationStatus:
       type: string
       enum: [approved, pending, rejected]
+    ModerationAuthor:
+      type: object
+      required: [id, username]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+    ModerationContentType:
+      type: string
+      enum: [post, review, comment, media]
+    ModerationQueueItem:
+      oneOf:
+        - $ref: "#/components/schemas/ModerationPost"
+        - $ref: "#/components/schemas/ModerationReview"
+        - $ref: "#/components/schemas/ModerationComment"
+        - $ref: "#/components/schemas/ModerationMedia"
+      discriminator:
+        propertyName: type
+        mapping:
+          post: "#/components/schemas/ModerationPost"
+          review: "#/components/schemas/ModerationReview"
+          comment: "#/components/schemas/ModerationComment"
+          media: "#/components/schemas/ModerationMedia"
+    ModerationEntry:
+      type: object
+      required: [id, type, status, submittedAt, author, content]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/ModerationContentType"
+        status:
+          $ref: "#/components/schemas/ModerationStatus"
+        submittedAt:
+          type: string
+          format: date-time
+        author:
+          $ref: "#/components/schemas/ModerationAuthor"
+        content:
+          type: object
+    ModerationPost:
+      allOf:
+        - $ref: "#/components/schemas/ModerationEntry"
+        - type: object
+          properties:
+            type:
+              const: post
+            content:
+              type: object
+              required: [kind, caption, item]
+              properties:
+                kind:
+                  const: item
+                caption:
+                  type: string
+                item:
+                  type: object
+                  required: [id, title, category, coverUrl]
+                  properties:
+                    id:
+                      type: string
+                    title:
+                      type: string
+                    category:
+                      type: string
+                    coverUrl:
+                      type: [string, "null"]
+    ModerationReview:
+      allOf:
+        - $ref: "#/components/schemas/ModerationEntry"
+        - type: object
+          properties:
+            type:
+              const: review
+            content:
+              type: object
+              required: [postId, itemId, text, authorScore]
+              properties:
+                postId:
+                  type: string
+                itemId:
+                  type: string
+                text:
+                  type: string
+                authorScore:
+                  type: [number, "null"]
+                  minimum: 1
+                  maximum: 10
+    ModerationComment:
+      allOf:
+        - $ref: "#/components/schemas/ModerationEntry"
+        - type: object
+          properties:
+            type:
+              const: comment
+            content:
+              type: object
+              required: [postId, parentId, text]
+              properties:
+                postId:
+                  type: string
+                parentId:
+                  type: [string, "null"]
+                text:
+                  type: string
+    ModerationMedia:
+      allOf:
+        - $ref: "#/components/schemas/ModerationEntry"
+        - type: object
+          properties:
+            type:
+              const: media
+            content:
+              type: object
+              required: [postId, mediaType, url, contentType, isCover]
+              properties:
+                postId:
+                  type: string
+                mediaType:
+                  type: string
+                  enum: [image, video, external]
+                url:
+                  type: string
+                  format: uri
+                contentType:
+                  type: [string, "null"]
+                isCover:
+                  type: boolean
+    ModerationQueuePage:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModerationQueueItem"
+        page:
+          type: object
+          required: [limit, nextCursor, hasMore]
+          properties:
+            limit:
+              type: integer
+            nextCursor:
+              type: [string, "null"]
+            hasMore:
+              type: boolean
+    ModerationDecision:
+      type: object
+      required: [id, type, status, moderatedAt, moderatedBy, reason]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/ModerationContentType"
+        status:
+          type: string
+          enum: [approved, rejected]
+        moderatedAt:
+          type: string
+          format: date-time
+        moderatedBy:
+          $ref: "#/components/schemas/ModerationAuthor"
+        reason:
+          type: [string, "null"]
+    ModerationRejectionInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
     UserSummary:
       type: object
       additionalProperties: false
@@ -767,9 +1166,10 @@ components:
       required: [authorScore]
       properties:
         authorScore:
-          type: number
+          type: [number, "null"]
           minimum: 1
           maximum: 10
+          description: Null si esta publicación de reseña no tiene puntuación.
     Post:
       type: object
       additionalProperties: false
@@ -851,7 +1251,7 @@ components:
     Comment:
       type: object
       additionalProperties: false
-      required: [id, postId, author, text, kind, likesCount, likedByCurrentUser, createdAt]
+      required: [id, postId, author, text, kind, isDeleted, likesCount, likedByCurrentUser, createdAt]
       properties:
         id:
           type: string
@@ -868,10 +1268,16 @@ components:
         kind:
           type: string
           enum: [comment, review]
+        isDeleted:
+          type: boolean
+          description: Indica si el texto fue eliminado; el marcador conserva el hilo de respuestas.
         authorScore:
-          type: number
+          type: [number, "null"]
           minimum: 1
           maximum: 10
+          description: En reseñas se incluye siempre; null cuando no se envió puntuación.
+        moderationStatus:
+          $ref: "#/components/schemas/ModerationStatus"
         likesCount:
           type: integer
           minimum: 0
@@ -907,7 +1313,14 @@ components:
     NewRankableItemInput:
       type: object
       additionalProperties: false
-      required: [category, title, creator]
+      required: [category, title]
+      oneOf:
+        - required: [creator]
+          not:
+            required: [creatorName]
+        - required: [creatorName]
+          not:
+            required: [creator]
       properties:
         category:
           type: string
@@ -921,12 +1334,17 @@ components:
           maxLength: 5000
         creator:
           $ref: "#/components/schemas/NewCreatorInput"
+        creatorName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Forma abreviada del creador aceptada por el cliente web.
         year:
           type: integer
         coverUrl:
           type: string
           maxLength: 2048
-          description: Opcional. También se puede cargar una portada a S3 después de crear el post.
+          description: Opcional; una portada cargada a S3 se entrega mediante una URL firmada temporal.
         identifiers:
           type: object
           additionalProperties:
@@ -936,10 +1354,7 @@ components:
           type: object
           additionalProperties:
             type: string
-          description: >-
-            Campos requeridos por categoría: music/podcasts/books/movies requieren format;
-            concerts requiere eventDate, venue y city; videogames requiere platform;
-            art requiere medium; boardgames requiere minPlayers, maxPlayers y playingTimeMinutes.
+          description: Datos específicos de la categoría, opcionales al crear desde /posts.
         externalLinks:
           type: array
           items:
@@ -1007,8 +1422,9 @@ components:
           minimum: 1
           maximum: 10485760
         isCover:
-          type: boolean
+          type: [boolean, "null"]
           default: false
+          description: Si es true, reemplaza la portada; si se omite o es null, se trata como false.
     ImageUploadUrl:
       type: object
       additionalProperties: false

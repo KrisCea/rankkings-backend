@@ -22,6 +22,14 @@ public final class IdentityDtos {
     public record UserSummary(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerifiedBusiness) {}
     public record User(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerifiedBusiness, boolean isAuthenticated, String role) {}
     public record Profile(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerifiedBusiness, String bio, long followersCount, long followingCount, long postsCount, boolean isFollowedByCurrentUser) {}
-    public record Principal(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerifiedBusiness) {}
+    public record Principal(
+            String id,
+            String username,
+            String displayName,
+            String avatarUrl,
+            String accountType,
+            boolean isVerifiedBusiness,
+            String role
+    ) {}
     public record AuthenticatedUser(String token, User user) {}
 }

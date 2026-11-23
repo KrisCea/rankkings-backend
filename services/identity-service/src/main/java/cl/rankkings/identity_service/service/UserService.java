@@ -122,7 +122,7 @@ public class UserService {
 
     private Principal toPrincipal(Account account) {
         return new Principal(account.getId(), account.getUsername(), account.getDisplayName(), avatar(account),
-                account.getAccountType(), false);
+                account.getAccountType(), false, account.getRole());
     }
 
     private String avatar(Account account) {

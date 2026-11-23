@@ -6,7 +6,11 @@ info:
     Contrato del servicio de identidad expuesto mediante el API Gateway.
     Las rutas se publican bajo /api. El gateway valida la sesión e inyecta
     X-User-Id para las operaciones autenticadas; los clientes no deben enviar
-    ni poder suplantar ese encabezado.
+    ni poder suplantar ese encabezado. Los perfiles públicos pueden consultarse
+    sin sesión; seguir perfiles y las demás acciones de participación requieren
+    autenticación. GET /users/me devuelve role=user o role=admin para que el
+    cliente presente las opciones correspondientes, sin sustituir la
+    autorización del servidor.
 servers:
   - url: http://localhost:8080/api
     description: API Gateway local

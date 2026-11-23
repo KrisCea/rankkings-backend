@@ -7,6 +7,7 @@ import cl.rankkings.social_service.dto.SocialDtos.NewPostInput;
 import cl.rankkings.social_service.dto.SocialDtos.NewRankableItemInput;
 import cl.rankkings.social_service.dto.SocialDtos.NewReviewInput;
 import cl.rankkings.social_service.model.PostComment;
+import cl.rankkings.social_service.model.PostRating;
 import cl.rankkings.social_service.model.SocialPost;
 import cl.rankkings.social_service.repository.CommentRepository;
 import cl.rankkings.social_service.repository.LikeRepository;
@@ -14,6 +15,7 @@ import cl.rankkings.social_service.repository.PostRepository;
 import cl.rankkings.social_service.repository.RatingRepository;
 import cl.rankkings.social_service.repository.ShareRepository;
 import cl.rankkings.social_service.repository.VoteRepository;
+import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,7 +29,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -61,9 +67,8 @@ class SocialServiceReviewTest {
         when(likes.countByCommentId(org.mockito.ArgumentMatchers.anyString())).thenReturn(0L);
         when(likes.findByCommentIdAndUserId(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(Optional.empty());
-        when(ratings.findByPostIdAndUserId("post-1", "reviewer")).thenReturn(Optional.empty());
-
-        socialService.addReview("post-1", new NewReviewInput("Buena obra", null), "reviewer");
+        Map<String, Object> response = socialService.addReview(
+                "post-1", new NewReviewInput("Buena obra", null), "reviewer");
 
         ArgumentCaptor<PostComment> review = ArgumentCaptor.forClass(PostComment.class);
         verify(comments).save(review.capture());
@@ -71,6 +76,78 @@ class SocialServiceReviewTest {
         assertEquals("reviewer", review.getValue().getAuthorId());
         assertEquals("review", review.getValue().getKind());
         assertEquals("Buena obra", review.getValue().getText());
+        assertEquals("pending", review.getValue().getModerationStatus());
+        assertNull(review.getValue().getAuthorScore());
+        assertTrue(response.containsKey("authorScore"));
+        assertNull(response.get("authorScore"));
+        verify(ratings, never()).saveAndFlush(org.mockito.ArgumentMatchers.any(PostRating.class));
+        verify(catalogClient, never()).updateRatingStats(anyString(), org.mockito.ArgumentMatchers.anyDouble(),
+                org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void keepsReviewScoreOutOfRatingsUntilReviewIsApproved() {
+        SocialPost itemPost = new SocialPost();
+        itemPost.setId("post-1");
+        itemPost.setKind("item");
+        itemPost.setItemId("item-1");
+        itemPost.setAuthorId("owner");
+        when(posts.findById("post-1")).thenReturn(Optional.of(itemPost));
+        JsonNode author = commentAuthorNode();
+        when(identityClient.getUser("reviewer")).thenReturn(author);
+        when(likes.countByCommentId(anyString())).thenReturn(0L);
+        when(likes.findByCommentIdAndUserId(anyString(), anyString())).thenReturn(Optional.empty());
+
+        Map<String, Object> response = socialService.addReview(
+                "post-1", new NewReviewInput("Buena obra", 8.5), "reviewer");
+
+        ArgumentCaptor<PostComment> comment = ArgumentCaptor.forClass(PostComment.class);
+        verify(comments).save(comment.capture());
+        assertEquals(8.5, comment.getValue().getAuthorScore());
+        assertEquals("pending", comment.getValue().getModerationStatus());
+        assertEquals(8.5, response.get("authorScore"));
+        verify(ratings, never()).saveAndFlush(org.mockito.ArgumentMatchers.any(PostRating.class));
+        verify(catalogClient, never()).updateRatingStats(anyString(), org.mockito.ArgumentMatchers.anyDouble(),
+                org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void validatesOptionalReviewScoreRange() {
+        try (var factory = Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            assertTrue(validator.validate(new NewReviewInput("Sin nota", null)).isEmpty());
+            assertTrue(validator.validate(new NewReviewInput("Nota mínima", 1.0)).isEmpty());
+            assertTrue(validator.validate(new NewReviewInput("Nota máxima", 10.0)).isEmpty());
+            assertFalse(validator.validate(new NewReviewInput("Nota baja", 0.0)).isEmpty());
+            assertFalse(validator.validate(new NewReviewInput("Nota alta", 10.1)).isEmpty());
+        }
+    }
+
+    @Test
+    void includesNullScoreInLegacyReviewPostPayload() {
+        SocialPost reviewPost = new SocialPost();
+        reviewPost.setId("post-1");
+        reviewPost.setKind("review");
+        reviewPost.setItemId("item-1");
+        reviewPost.setAuthorId("reviewer");
+        when(posts.findById("post-1")).thenReturn(Optional.of(reviewPost));
+        JsonNode item = org.mockito.Mockito.mock(JsonNode.class);
+        stubString(item, "category", "music");
+        stubString(item, "coverUrl", "");
+        JsonNode author = authorNode();
+        when(catalogClient.getItem("item-1", null)).thenReturn(item);
+        when(identityClient.getUser("reviewer")).thenReturn(author);
+        when(ratings.findByPostId("post-1")).thenReturn(List.of());
+        when(postMediaService.mediaForPost("post-1", null)).thenReturn(List.of());
+        when(votes.countByPostId("post-1")).thenReturn(0L);
+        when(comments.countByPostIdAndModerationStatusAndDeletedAtIsNull("post-1", "approved")).thenReturn(0L);
+        when(shares.countByPostId("post-1")).thenReturn(0L);
+
+        Map<String, Object> response = socialService.getPost("post-1", null);
+
+        Map<?, ?> review = assertInstanceOf(Map.class, response.get("review"));
+        assertTrue(review.containsKey("authorScore"));
+        assertNull(review.get("authorScore"));
     }
 
     @Test
@@ -80,18 +157,23 @@ class SocialServiceReviewTest {
     }
 
     @Test
+    void hidesPendingPostsFromVisitors() {
+        SocialPost pendingPost = new SocialPost();
+        pendingPost.setId("post-1");
+        pendingPost.setAuthorId("author");
+        pendingPost.setModerationStatus("pending");
+        when(posts.findById("post-1")).thenReturn(Optional.of(pendingPost));
+
+        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> socialService.getPost("post-1", null));
+
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, error.getStatusCode());
+    }
+
+    @Test
     void createsRankableItemAndPostWithoutCoverOrExternalLinks() {
         NewRankableItemInput itemInput = new NewRankableItemInput(
-                "books",
-                "Libro",
-                null,
-                new NewCreatorInput(null, "Autora", null, null, null),
-                null,
-                null,
-                null,
-                Map.of("format", "novel"),
-                null
-        );
+                "books", "Libro", null, null, null, null, null, null, null, "Autora");
         NewPostInput postInput = new NewPostInput(null, itemInput, "item", "Mi publicación");
         JsonNode createdItem = org.mockito.Mockito.mock(JsonNode.class);
         stubString(createdItem, "id", "generated-item-id");
@@ -107,19 +189,21 @@ class SocialServiceReviewTest {
         when(ratings.findByPostIdAndUserId(anyString(), anyString())).thenReturn(Optional.empty());
         when(votes.countByPostId(anyString())).thenReturn(0L);
         when(votes.findByPostIdAndUserId(anyString(), anyString())).thenReturn(Optional.empty());
-        when(comments.countByPostId(anyString())).thenReturn(0L);
+        when(comments.countByPostIdAndModerationStatusAndDeletedAtIsNull(anyString(), eq("approved"))).thenReturn(0L);
         when(shares.countByPostId(anyString())).thenReturn(0L);
-        when(postMediaService.mediaForPost(anyString())).thenReturn(List.of());
+        when(postMediaService.mediaForPost(anyString(), anyString())).thenReturn(List.of());
 
         socialService.createPost(postInput, "reviewer");
 
         ArgumentCaptor<SocialPost> post = ArgumentCaptor.forClass(SocialPost.class);
-        verify(posts).save(post.capture());
+        verify(posts).saveAndFlush(post.capture());
         assertEquals("generated-item-id", post.getValue().getItemId());
         assertEquals("reviewer", post.getValue().getAuthorId());
         assertEquals("item", post.getValue().getKind());
+        assertEquals("approved", post.getValue().getModerationStatus());
         UUID.fromString(post.getValue().getId());
         verify(catalogClient).createItem(eq(itemInput), eq("reviewer"), eq(post.getValue().getId()));
+        assertEquals("Autora", itemInput.creatorInput().name());
     }
 
     @Test
@@ -137,9 +221,9 @@ class SocialServiceReviewTest {
         when(identityClient.getUser("owner")).thenReturn(author);
         when(ratings.findByPostId("post-1")).thenReturn(java.util.List.of());
         when(votes.countByPostId("post-1")).thenReturn(0L);
-        when(comments.countByPostId("post-1")).thenReturn(0L);
+        when(comments.countByPostIdAndModerationStatusAndDeletedAtIsNull("post-1", "approved")).thenReturn(0L);
         when(shares.countByPostId("post-1")).thenReturn(0L);
-        when(postMediaService.mediaForPost("post-1")).thenReturn(java.util.List.of());
+        when(postMediaService.mediaForPost("post-1", "viewer")).thenReturn(java.util.List.of());
 
         var result = socialService.getItemPost("item-1", "viewer");
 

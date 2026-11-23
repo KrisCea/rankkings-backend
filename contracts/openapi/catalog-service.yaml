@@ -3,9 +3,11 @@ info:
   title: RankKings Catalog Service API
   version: 1.0.0
   description: >-
-    Lectura del catálogo de obras. El gateway publica estas rutas bajo /api y
-    las reenvía al catálogo. X-User-Id es un encabezado interno que solo debe
-    inyectar el gateway tras validar la sesión.
+    Lectura pública del catálogo para visitantes sin sesión; guardar obras
+    requiere autenticación y cada usuario solo administra sus propios guardados.
+    El gateway publica estas rutas bajo /api y las reenvía al catálogo.
+    X-User-Id es un encabezado interno que solo debe inyectar el gateway tras
+    validar la sesión.
 servers:
   - url: http://localhost:8080/api
     description: API Gateway local
@@ -98,8 +100,8 @@ paths:
       summary: Crear una obra desde un servicio interno
       description: >-
         Asigna automáticamente el ID interno. Los identificadores externos,
-        la portada y los enlaces son opcionales. details debe contener los
-        datos requeridos para la categoría seleccionada.
+        la portada, los detalles y los enlaces son opcionales. Si se envían
+        details, deben incluir los campos requeridos para la categoría seleccionada.
       parameters:
         - $ref: "#/components/parameters/InternalKey"
       requestBody:
@@ -121,6 +123,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Acceso interno denegado.
+  /internal/items/{itemId}/cover:
+    put:
+      tags: [Items]
+      operationId: updateRankableItemCover
+      summary: Actualizar la portada de una obra desde el servicio social
+      parameters:
+        - $ref: "#/components/parameters/InternalKey"
+        - $ref: "#/components/parameters/ItemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [postId, coverUrl]
+              properties:
+                postId:
+                  type: string
+                coverUrl:
+                  type: string
+                  maxLength: 2048
+      responses:
+        "204":
+          description: Portada actualizada.
+        "403":
+          description: Acceso interno denegado.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: La obra no pertenece al post indicado.
+  /internal/items/by-post/{postId}:
+    delete:
+      tags: [Items]
+      operationId: deleteUnpublishedRankableItem
+      summary: Revertir la creación de una obra que no pudo publicarse
+      parameters:
+        - $ref: "#/components/parameters/InternalKey"
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Obra eliminada.
         "403":
           description: Acceso interno denegado.
 components:
@@ -168,6 +218,9 @@ components:
     VerificationStatus:
       type: string
       enum: [verified, partial, unverified]
+      description: >-
+        Estado de verificación de la obra. unverified significa que la
+        verificación está pendiente y no impide publicar ni consultar la obra.
     Creator:
       type: object
       additionalProperties: false
@@ -233,7 +286,7 @@ components:
           additionalProperties:
             type: string
           description: >-
-            Campos requeridos por categoría: music/podcasts/books/movies requieren format;
+            Opcional al crear la obra; si se envía, music/podcasts/books/movies requieren format;
             concerts requiere eventDate, venue y city; videogames requiere platform;
             art requiere medium; boardgames requiere minPlayers, maxPlayers y playingTimeMinutes.
         externalLinks:
@@ -316,7 +369,7 @@ components:
           type: integer
         coverUrl:
           type: string
-          description: URL de portada; puede estar vacío si la portada se subió como imagen del post.
+          description: URL de portada; si se sube una imagen al post, es una ruta estable de la API que redirige a S3.
         identifiers:
           type: object
           additionalProperties:

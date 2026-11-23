@@ -24,4 +24,6 @@ public interface SavedItemRepository extends JpaRepository<SavedItem, String> {
     Set<String> findSavedItemIdsByUser(@Param("userId") String userId, @Param("itemIds") Collection<String> itemIds);
 
     int countByItemId(String itemId);
+
+    void deleteByItemId(String itemId);
 }

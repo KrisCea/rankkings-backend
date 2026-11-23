@@ -1,0 +1,69 @@
+services:
+  identity-service:
+    build:
+      context: ./services/identity-service
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8081
+      SERVICE_BIND_ADDRESS: 0.0.0.0
+      SPRING_DATASOURCE_URL: ${IDENTITY_DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${IDENTITY_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
+      DEV_CAPTCHA_BYPASS: "false"
+      DEV_VERIFICATION_LOGGING: "false"
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      VERIFICATION_FROM_EMAIL: ${VERIFICATION_FROM_EMAIL:-}
+      VERIFICATION_URL: ${VERIFICATION_URL}
+      SOCIAL_SERVICE_URL: http://social-service:8083
+    expose:
+      - "8081"
+
+  catalog-service:
+    build:
+      context: ./services/catalog-service
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8082
+      SERVICE_BIND_ADDRESS: 0.0.0.0
+      SPRING_DATASOURCE_URL: ${CATALOG_DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${CATALOG_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${CATALOG_DB_PASSWORD}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      SEED_CATALOG: "false"
+    expose:
+      - "8082"
+
+  social-service:
+    build:
+      context: ./services/social-service
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8083
+      SERVICE_BIND_ADDRESS: 0.0.0.0
+      SPRING_DATASOURCE_URL: ${SOCIAL_DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${SOCIAL_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${SOCIAL_DB_PASSWORD}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    expose:
+      - "8083"
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+      SOCIAL_SERVICE_URL: http://social-service:8083
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS}
+    ports:
+      - "8080:8080"

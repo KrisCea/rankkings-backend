@@ -75,4 +75,14 @@ public class CatalogDtos {
             double averageRating,
             int ratingsCount
     ) {}
+
+    public record ItemCoverUpdateInput(
+            @NotBlank String postId,
+            @NotNull @Size(max = 2048) String coverUrl
+    ) {}
+
+    public record ItemModerationUpdateInput(
+            @NotBlank String postId,
+            @NotBlank String status
+    ) {}
 }

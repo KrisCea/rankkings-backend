@@ -7,11 +7,13 @@ import cl.rankkings.social_service.dto.SocialDtos.RatingInput;
 import cl.rankkings.social_service.dto.SocialDtos.ShareInput;
 import cl.rankkings.social_service.dto.SocialDtos.ExternalMediaInput;
 import cl.rankkings.social_service.dto.SocialDtos.ImageUploadInput;
+import cl.rankkings.social_service.dto.SocialDtos.ModerationRejectionInput;
 import cl.rankkings.social_service.service.PostMediaService;
 import cl.rankkings.social_service.service.SocialService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -46,12 +49,51 @@ public class SocialController {
         return socialService.featured(viewerId);
     }
 
+    @GetMapping("/admin/moderation")
+    public Map<String, Object> moderationQueue(
+            @RequestParam(defaultValue = "pending") String status,
+            @RequestParam(defaultValue = "all") String type,
+            @RequestParam(defaultValue = "25") int limit,
+            @RequestParam(required = false) String cursor,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return socialService.moderationQueue(status, type, limit, cursor, viewerId);
+    }
+
+    @PostMapping("/admin/moderation/{type}/{id}/approve")
+    public Map<String, Object> approveModeration(
+            @PathVariable String type,
+            @PathVariable String id,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return socialService.decideModeration(type, id, true, null, viewerId);
+    }
+
+    @PostMapping("/admin/moderation/{type}/{id}/reject")
+    public Map<String, Object> rejectModeration(
+            @PathVariable String type,
+            @PathVariable String id,
+            @Valid @RequestBody ModerationRejectionInput input,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return socialService.decideModeration(type, id, false, input.reason(), viewerId);
+    }
+
     @GetMapping("/posts/{id}")
     public Map<String, Object> get(
             @PathVariable String id,
             @RequestHeader(value = "X-User-Id", required = false) String viewerId
     ) {
         return socialService.getPost(id, viewerId);
+    }
+
+    @DeleteMapping("/posts/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePost(
+            @PathVariable String id,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        socialService.deletePost(id, viewerId);
     }
 
     @GetMapping("/posts/by-item/{itemId}")
@@ -98,6 +140,16 @@ public class SocialController {
         return socialService.addReview(id, input, viewerId);
     }
 
+    @DeleteMapping("/posts/{postId}/reviews/{reviewId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteReview(
+            @PathVariable String postId,
+            @PathVariable String reviewId,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        socialService.deleteReview(postId, reviewId, viewerId);
+    }
+
     @PostMapping("/posts/{id}/media/uploads")
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> prepareImageUpload(
@@ -109,12 +161,24 @@ public class SocialController {
     }
 
     @PostMapping("/posts/{id}/media/{mediaId}/complete")
-    public Map<String, String> confirmImageUpload(
+    public Map<String, Object> confirmImageUpload(
             @PathVariable String id,
             @PathVariable String mediaId,
             @RequestHeader(value = "X-User-Id", required = false) String viewerId
     ) {
-        return postMediaService.confirmImageUpload(id, mediaId, viewerId);
+        postMediaService.confirmImageUpload(id, mediaId, viewerId);
+        return socialService.getPost(id, viewerId);
+    }
+
+    @GetMapping("/posts/{id}/media/{mediaId}/content")
+    public ResponseEntity<Void> mediaContent(
+            @PathVariable String id,
+            @PathVariable String mediaId,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(postMediaService.mediaContentUrl(id, mediaId, viewerId)))
+                .build();
     }
 
     @PostMapping("/posts/{id}/media/external")
@@ -187,6 +251,15 @@ public class SocialController {
             @RequestHeader(value = "X-User-Id", required = false) String viewerId
     ) {
         return socialService.addComment(id, input, viewerId);
+    }
+
+    @DeleteMapping("/comments/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteComment(
+            @PathVariable String id,
+            @RequestHeader(value = "X-User-Id", required = false) String viewerId
+    ) {
+        socialService.deleteComment(id, viewerId);
     }
 
     @PostMapping("/comments/{id}/like")

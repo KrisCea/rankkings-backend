@@ -10,8 +10,20 @@ $login = Invoke-RestMethod -WebSession $session -Uri "$base/auth/login" -Method 
 if (-not $login.isAuthenticated) { throw 'Login falló' }
 $me = Invoke-RestMethod -WebSession $session -Uri "$base/users/me" -Method Get
 if ($me.id -ne $login.id) { throw 'Sesión inconsistente' }
-$post = Invoke-RestMethod -WebSession $session -Uri "$base/posts" -Method Post -ContentType 'application/json' -Body (@{ itemId='item-1'; kind='review'; caption='Reseña de prueba de integración'; authorScore=8.5 } | ConvertTo-Json)
+$postPayload = @{
+    kind='item'
+    caption='Publicación de prueba de integración'
+    rankableItem=@{
+        category='books'
+        title="Prueba integración $([Guid]::NewGuid().ToString('N'))"
+        description='Obra creada automáticamente por la prueba local'
+        creator=@{ name='Autor de prueba' }
+    }
+}
+$post = Invoke-RestMethod -WebSession $session -Uri "$base/posts" -Method Post -ContentType 'application/json' -Body ($postPayload | ConvertTo-Json -Depth 5)
 if (-not $post.id) { throw 'No se creó la publicación' }
+$review = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/reviews" -Method Post -ContentType 'application/json' -Body (@{text='Reseña de prueba de integración'; authorScore=8.5} | ConvertTo-Json)
+if (-not $review.id) { throw 'No se creó la reseña' }
 $voted = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/vote" -Method Post
 if (-not $voted.votedByCurrentUser) { throw 'No se registró el voto' }
 $rating = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/rating" -Method Put -ContentType 'application/json' -Body (@{score=9} | ConvertTo-Json)
@@ -23,4 +35,4 @@ if (-not $liked.likedByCurrentUser) { throw 'No se registró el like' }
 $comments = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/comments"
 if ($comments.Count -lt 1) { throw 'No se recuperaron comentarios' }
 Invoke-RestMethod -WebSession $session -Uri "$base/auth/logout" -Method Post | Out-Null
-Write-Host "OK: login, sesión, creación de reseña, voto, rating, comentario, like y logout. Post $($post.id)"
+Write-Host "OK: login, sesión, creación de publicación y reseña, voto, rating, comentario, like y logout. Post $($post.id)"

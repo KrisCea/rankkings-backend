@@ -26,13 +26,32 @@ public final class SocialDtos {
             @NotBlank @Size(max = 40) String category,
             @NotBlank @Size(max = 200) String title,
             @Size(max = 5000) String description,
-            @NotNull @Valid NewCreatorInput creator,
+            @Valid NewCreatorInput creator,
             Integer year,
             @Size(max = 2048) String coverUrl,
             Map<String, String> identifiers,
             Map<String, String> details,
-            List<@Valid NewExternalLinkInput> externalLinks
-    ) {}
+            List<@Valid NewExternalLinkInput> externalLinks,
+            @Size(max = 200) String creatorName
+    ) {
+        public NewRankableItemInput(
+                String category,
+                String title,
+                String description,
+                NewCreatorInput creator,
+                Integer year,
+                String coverUrl,
+                Map<String, String> identifiers,
+                Map<String, String> details,
+                List<NewExternalLinkInput> externalLinks
+        ) {
+            this(category, title, description, creator, year, coverUrl, identifiers, details, externalLinks, null);
+        }
+
+        public NewCreatorInput creatorInput() {
+            return creator != null ? creator : new NewCreatorInput(null, creatorName, null, null, null);
+        }
+    }
 
     public record NewCreatorInput(
             String id,
@@ -59,10 +78,15 @@ public final class SocialDtos {
     public record ImageUploadInput(
             @NotBlank String contentType,
             @NotNull @Positive @Max(10_485_760) Long sizeBytes,
-            boolean isCover
-    ) {}
+            Boolean isCover
+    ) {
+        public ImageUploadInput {
+            isCover = Boolean.TRUE.equals(isCover);
+        }
+    }
     public record ExternalMediaInput(
             @NotBlank @Size(max = 2048) String url,
             @NotBlank @Size(max = 20) String type
     ) {}
+    public record ModerationRejectionInput(@NotBlank @Size(max = 1000) String reason) {}
 }

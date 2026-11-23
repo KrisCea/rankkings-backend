@@ -31,7 +31,7 @@ public class CatalogServiceClient {
 
     public JsonNode getItem(String itemId, String viewerId) {
         String encodedId = encode(itemId);
-        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(catalogUrl + "/items/" + encodedId))
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(catalogUrl + "/internal/items/" + encodedId))
                 .timeout(Duration.ofSeconds(3))
                 .header("X-Internal-Key", internalKey)
                 .GET();
@@ -41,12 +41,36 @@ public class CatalogServiceClient {
         return get(request.build());
     }
 
+    public void updateItemModerationStatus(String itemId, String postId, String status) {
+        try {
+            String body = mapper.writeValueAsString(Map.of("postId", postId, "status", status));
+            HttpRequest request = HttpRequest.newBuilder(URI.create(
+                            catalogUrl + "/internal/items/" + encode(itemId) + "/moderation"))
+                    .timeout(Duration.ofSeconds(3))
+                    .header("X-Internal-Key", internalKey)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            if (response.statusCode() != 204) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo actualizar la moderación del catálogo");
+            }
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Actualización de moderación interrumpida");
+        } catch (Exception exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Catálogo no disponible");
+        }
+    }
+
     public JsonNode createItem(NewRankableItemInput input, String authorId, String postId) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("category", input.category());
         body.put("title", input.title());
         body.put("description", input.description());
-        body.put("creator", input.creator());
+        body.put("creator", input.creatorInput());
         body.put("uploadedBy", authorId);
         body.put("year", input.year());
         body.put("coverUrl", input.coverUrl());
@@ -102,6 +126,52 @@ public class CatalogServiceClient {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Actualización interrumpida");
         } catch (Exception exception) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Catálogo no disponible");
+        }
+    }
+
+    public void updateItemCover(String itemId, String postId, String coverUrl) {
+        try {
+            String body = mapper.writeValueAsString(Map.of("postId", postId, "coverUrl", coverUrl));
+            HttpRequest request = HttpRequest.newBuilder(URI.create(
+                            catalogUrl + "/internal/items/" + encode(itemId) + "/cover"))
+                    .timeout(Duration.ofSeconds(3))
+                    .header("X-Internal-Key", internalKey)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            if (response.statusCode() != 204) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo actualizar la portada del catálogo");
+            }
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Actualización de portada interrumpida");
+        } catch (Exception exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Catálogo no disponible");
+        }
+    }
+
+    public void deleteCreatedItem(String postId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(
+                            catalogUrl + "/internal/items/by-post/" + encode(postId)))
+                    .timeout(Duration.ofSeconds(3))
+                    .header("X-Internal-Key", internalKey)
+                    .DELETE()
+                    .build();
+            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            if (response.statusCode() != 204 && response.statusCode() != 404) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo revertir la creación del Rankable Item");
+            }
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Reversión del Rankable Item interrumpida");
+        } catch (Exception exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Catálogo no disponible para revertir el Rankable Item");
         }
     }
 
