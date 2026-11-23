@@ -157,7 +157,6 @@ spring:
 rankkings:
   identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
   internal-key: ${INTERNAL_SERVICE_KEY:}
-  jwt-secret: ${RANKINGS_JWT_SECRET:rankkings-local-development-secret-2026-32bytes}
   allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   csrf-secure: ${COOKIE_SECURE:false}
 
@@ -166,5 +165,3 @@ spring:
   config:
     activate:
       on-profile: prod
-rankkings:
-  jwt-secret: ${RANKINGS_JWT_SECRET:}

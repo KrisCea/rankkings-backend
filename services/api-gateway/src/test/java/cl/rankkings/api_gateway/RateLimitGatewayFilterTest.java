@@ -15,7 +15,7 @@ class RateLimitGatewayFilterTest {
         for (int i = 0; i < 21; i++) {
             MockServerWebExchange exchange = MockServerWebExchange.from(
                     MockServerHttpRequest.post("/api/v1/auth/login")
-                            .header("X-Forwarded-For", "203.0.113.10")
+                            .header("X-Forwarded-For", "198.51.100." + i + ", 203.0.113.10")
                             .build());
             filter.filter(exchange, ex -> Mono.empty()).block();
             if (i == 20) {

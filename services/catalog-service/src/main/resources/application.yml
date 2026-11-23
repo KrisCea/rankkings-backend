@@ -48,6 +48,9 @@ spring:
   config:
     activate:
       on-profile: prod
+  h2:
+    console:
+      enabled: false
   datasource:
     url: ${SPRING_DATASOURCE_URL:${CATALOG_DB_URL:jdbc:postgresql://localhost:5432/catalog_db}}
     driver-class-name: org.postgresql.Driver

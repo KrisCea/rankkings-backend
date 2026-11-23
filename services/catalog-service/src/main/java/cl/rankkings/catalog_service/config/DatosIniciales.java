@@ -7,6 +7,7 @@ import cl.rankkings.catalog_service.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
+@Profile("!prod")
 @RequiredArgsConstructor
 public class DatosIniciales implements CommandLineRunner {
 
@@ -30,8 +32,8 @@ public class DatosIniciales implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws IOException {
-        seedOriginalExamples();
         if (seedCatalog) {
+            seedOriginalExamples();
             seedCatalogCsv();
         }
     }

@@ -57,7 +57,6 @@ Todas las claves pueden entregarse mediante variables de entorno de ECS o secret
 - `CATALOG_SERVICE_URL`
 - `SOCIAL_SERVICE_URL`
 - `INTERNAL_SERVICE_KEY`
-- `RANKINGS_JWT_SECRET`
 - `FRONTEND_ORIGINS`
 
 ### Identity
@@ -129,6 +128,8 @@ Los servicios exponen:
 ```
 
 El gateway expone `/actuator/health`.
+
+El rate limiter usa el último valor de `X-Forwarded-For`, añadido por el ALB. El grupo de seguridad de las tareas del Gateway debe aceptar tráfico solo desde el ALB; no expongas directamente el Gateway por otra ruta.
 
 ## Preflight local
 

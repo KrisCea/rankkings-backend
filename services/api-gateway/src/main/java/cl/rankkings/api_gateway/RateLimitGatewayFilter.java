@@ -24,7 +24,7 @@ public class RateLimitGatewayFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return -80;
+        return -190;
     }
 
     @Override
@@ -53,9 +53,17 @@ public class RateLimitGatewayFilter implements GlobalFilter, Ordered {
     private String clientKey(ServerWebExchange exchange) {
         String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+            String[] addresses = forwarded.split(",");
+            for (int i = addresses.length - 1; i >= 0; i--) {
+                if (!addresses[i].isBlank()) {
+                    // The ALB appends the client address; earlier values may come from the client.
+                    return addresses[i].trim();
+                }
+            }
         }
         var remote = exchange.getRequest().getRemoteAddress();
-        return remote == null ? "unknown" : remote.getAddress().getHostAddress();
+        return remote == null || remote.getAddress() == null
+                ? "unknown"
+                : remote.getAddress().getHostAddress();
     }
 }
