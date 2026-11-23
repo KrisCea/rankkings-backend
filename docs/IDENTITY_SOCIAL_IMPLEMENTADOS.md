@@ -31,7 +31,7 @@ Para usar Cloudflare Turnstile, configura `TURNSTILE_SECRET` en Identity y `VITE
 
 ### Producción — trabajo pendiente obligatorio
 
-El desarrollo es **un MVP**, no un sistema listo para exponer en internet. Antes de producción: implementar rate limiting de login/registro/verificación; protección adicional de CSRF según modelo de despliegue, pruebas de seguridad, observabilidad, migraciones Flyway/Liquibase y conexiones PostgreSQL con bases separadas; TLS y `COOKIE_SECURE=true`; secretos externos; firewall/red privada entre servicios; envío y reintento robustos de correos; protección de datos; estrategia transaccional eventual/outbox para sincronizar ratings entre Social y Catalog; paginación, moderación y búsqueda destacada real. El Gateway no habilita JWT Bearer aunque el contrato lo documenta como posibilidad futura.
+El desarrollo es **un MVP**, no un sistema listo para exponer en internet. Antes de producción: implementar rate limiting de login/registro/verificación; protección adicional de CSRF según modelo de despliegue, pruebas de seguridad, observabilidad y alertas; TLS y `COOKIE_SECURE=true`; secretos externos como `RANKINGS_JWT_SECRET` e `INTERNAL_SERVICE_KEY`; firewall/red privada entre servicios; envío y reintento robustos de correos; protección de datos; estrategia transaccional eventual/outbox para sincronizar ratings entre Social y Catalog; paginación, moderación y búsqueda destacada real. JWT y Bearer están implementados, pero siguen pendientes los controles operativos y de seguridad anteriores.
 
 El filtro de catálogo requiere `INTERNAL_SERVICE_KEY` incluso al llamar `localhost:8082` directamente. Es intencional: para pruebas HTTP utilizar `http://localhost:8080/api/...` y la sesión del navegador.
 

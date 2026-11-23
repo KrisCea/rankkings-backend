@@ -57,6 +57,7 @@ Todas las claves pueden entregarse mediante variables de entorno de ECS o secret
 - `CATALOG_SERVICE_URL`
 - `SOCIAL_SERVICE_URL`
 - `INTERNAL_SERVICE_KEY`
+- `RANKINGS_JWT_SECRET`
 - `FRONTEND_ORIGINS`
 
 ### Identity

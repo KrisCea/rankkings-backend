@@ -195,4 +195,4 @@ Construir las imágenes sin credenciales AWS:
 
 ## Seguridad y límites
 
-El Gateway valida la cookie de sesión opaca `rk_token`; no usa JWT. Los servicios internos requieren una clave compartida y deben permanecer detrás del Gateway. El perfil local desactiva la verificación real de captcha y muestra los enlaces de verificación en consola: no lo uses en producción. Antes de exponer la aplicación se requieren, entre otras medidas, rate limiting, TLS, migraciones de base de datos y pruebas de seguridad.
+El Gateway valida el JWT transportado en la cookie HttpOnly `rk_token` o en `Authorization: Bearer`, elimina la identidad aportada por el navegador y reinyecta cabeceras internas verificadas. Los servicios internos requieren una clave compartida y deben permanecer detrás del Gateway. El perfil local desactiva la verificación real de captcha y muestra los enlaces de verificación en consola: no lo uses en producción. Antes de exponer la aplicación se requieren, entre otras medidas, rate limiting, TLS, observabilidad, protección CSRF según el modelo de despliegue y pruebas de seguridad.
