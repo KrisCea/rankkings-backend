@@ -1,12 +1,17 @@
 # Prueba de integración contra cuatro servicios ya levantados; requiere una cuenta verificada.
 $ErrorActionPreference = "Stop"
-$base = "http://localhost:8080/api"
+$base = "http://localhost:8080/api/v1"
 $email = Read-Host "Email verificado"
 $secret = Read-Host "Contraseña" -AsSecureString
 $password = [System.Net.NetworkCredential]::new("", $secret).Password
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$csrfUri = "http://localhost:8080/api/v1/csrf"
+Invoke-RestMethod -WebSession $session -Uri $csrfUri -Method Get | Out-Null
+$csrfCookie = $session.Cookies.GetCookies([uri]$csrfUri)["XSRF-TOKEN"]
+if ($null -eq $csrfCookie) { throw "No se emitió el token CSRF" }
+$csrfHeaders = @{ "X-XSRF-TOKEN" = $csrfCookie.Value }
 $payload = @{email=$email; password=$password} | ConvertTo-Json
-$login = Invoke-RestMethod -WebSession $session -Uri "$base/auth/login" -Method Post -ContentType 'application/json' -Body $payload
+$login = Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/auth/login" -Method Post -ContentType 'application/json' -Body $payload
 if (-not $login.isAuthenticated) { throw 'Login falló' }
 $me = Invoke-RestMethod -WebSession $session -Uri "$base/users/me" -Method Get
 if ($me.id -ne $login.id) { throw 'Sesión inconsistente' }
@@ -20,19 +25,19 @@ $postPayload = @{
         creator=@{ name='Autor de prueba' }
     }
 }
-$post = Invoke-RestMethod -WebSession $session -Uri "$base/posts" -Method Post -ContentType 'application/json' -Body ($postPayload | ConvertTo-Json -Depth 5)
+$post = Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/posts" -Method Post -ContentType 'application/json' -Body ($postPayload | ConvertTo-Json -Depth 5)
 if (-not $post.id) { throw 'No se creó la publicación' }
-$review = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/reviews" -Method Post -ContentType 'application/json' -Body (@{text='Reseña de prueba de integración'; authorScore=8.5} | ConvertTo-Json)
+$review = Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/posts/$($post.id)/reviews" -Method Post -ContentType 'application/json' -Body (@{text='Reseña de prueba de integración'; authorScore=8.5} | ConvertTo-Json)
 if (-not $review.id) { throw 'No se creó la reseña' }
-$voted = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/vote" -Method Post
+$voted = Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/posts/$($post.id)/vote" -Method Post
 if (-not $voted.votedByCurrentUser) { throw 'No se registró el voto' }
-$rating = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/rating" -Method Put -ContentType 'application/json' -Body (@{score=9} | ConvertTo-Json)
+$rating = Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/posts/$($post.id)/rating" -Method Put -ContentType 'application/json' -Body (@{score=9} | ConvertTo-Json)
 if ($rating.currentUserRating -ne 9) { throw 'No se registró la puntuación' }
-$comment = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/comments" -Method Post -ContentType 'application/json' -Body (@{text='Comentario de prueba'} | ConvertTo-Json)
+$comment = Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/posts/$($post.id)/comments" -Method Post -ContentType 'application/json' -Body (@{text='Comentario de prueba'} | ConvertTo-Json)
 if (-not $comment.id) { throw 'No se creó el comentario' }
-$liked = Invoke-RestMethod -WebSession $session -Uri "$base/comments/$($comment.id)/like" -Method Post
+$liked = Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/comments/$($comment.id)/like" -Method Post
 if (-not $liked.likedByCurrentUser) { throw 'No se registró el like' }
 $comments = Invoke-RestMethod -WebSession $session -Uri "$base/posts/$($post.id)/comments"
 if ($comments.Count -lt 1) { throw 'No se recuperaron comentarios' }
-Invoke-RestMethod -WebSession $session -Uri "$base/auth/logout" -Method Post | Out-Null
+Invoke-RestMethod -WebSession $session -Headers $csrfHeaders -Uri "$base/auth/logout" -Method Post | Out-Null
 Write-Host "OK: login, sesión, creación de publicación y reseña, voto, rating, comentario, like y logout. Post $($post.id)"

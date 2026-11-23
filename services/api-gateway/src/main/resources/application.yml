@@ -4,7 +4,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
@@ -21,6 +21,12 @@ spring:
           # X-User-Id tras validación; NO añadir RemoveRequestHeader aquí.
           routes:
             # Las rutas más específicas deben declararse antes que las genéricas.
+            - id: csrf-token
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/csrf,/api/v1/csrf
+              filters:
+                - StripPrefix=2
             - id: catalog-v1-saved-items
               uri: ${CATALOG_SERVICE_URL:http://localhost:8082}
               predicates:
@@ -153,6 +159,7 @@ rankkings:
   internal-key: ${INTERNAL_SERVICE_KEY:}
   jwt-secret: ${RANKINGS_JWT_SECRET:rankkings-local-development-secret-2026-32bytes}
   allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  csrf-secure: ${COOKIE_SECURE:false}
 
 ---
 spring:

@@ -139,3 +139,16 @@ docker compose --env-file .env.aws -f docker-compose.aws.yml up --build
 ```
 
 Ese compose requiere bases PostgreSQL accesibles según las URLs configuradas.
+
+## Estado de preparación
+
+Implementado en el código:
+- JWT, Spring Security, CSRF y límites de solicitudes en el Gateway.
+- Métricas Prometheus y identificador `X-Request-Id`.
+- Perfiles de producción con `ddl-auto=validate` y Flyway.
+- Dockerfiles y Compose previo a AWS.
+
+Pendiente externo al repositorio:
+- Docker Desktop activo para ejecutar PostgreSQL y comprobar las tres migraciones.
+- Credenciales reales de RDS, S3, Turnstile y Resend.
+- Recursos ECS/Fargate, ALB, ACM, DNS y Secrets Manager.
