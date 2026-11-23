@@ -46,6 +46,15 @@ El script activa el perfil `local`, genera una clave interna aleatoria compartid
 
 ## Roles y permisos
 
+## Seguridad JWT y versionado
+
+- El inicio de sesión devuelve una cookie `rk_token` HttpOnly con JWT firmado. También se admite `Authorization: Bearer`.
+- El secreto JWT se configura con `RANKINGS_JWT_SECRET` y debe tener al menos 32 bytes.
+- El API Gateway valida el JWT, elimina identidad enviada por el cliente y reinyecta las cabeceras internas `X-User-Id`, `X-Username` y `X-User-Role`.
+- Las rutas nuevas usan `/api/v1`; las rutas `/api/**` se mantienen para compatibilidad.
+- Swagger de cada servicio: `/swagger-ui.html` en Identity (`8081`), Catalog (`8082`) y Social (`8083`).
+- En producción se deben definir secretos fuertes para `RANKINGS_JWT_SECRET` e `INTERNAL_SERVICE_KEY`, y habilitar `COOKIE_SECURE=true`.
+
 El acceso se aplica en el backend; ocultar acciones en el frontend no reemplaza estas validaciones:
 
 | Estado/rol | Permisos |

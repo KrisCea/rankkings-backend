@@ -1,34 +1,43 @@
-# RankKings — estado de integración local
+# RankKings — Estado de integración
 
-## Cambios de esta iteración
+## Arquitectura y seguridad
 
-- El API Gateway escucha en `8080` (configurable con `SERVER_PORT`).
-- `identity-service`, `catalog-service` y `social-service` quedan asignados a `8081`, `8082` y `8083`.
-- El Gateway publica el prefijo `/api`, lo elimina al reenviar y enruta las rutas del frontend por dominio.
-- `/api/users/me/saved` se dirige al catálogo; `/api/users/{username}/posts` y `/api/items/{itemId}/reviews` se dirigen a Social antes de las rutas genéricas.
-- CORS admite por defecto los orígenes Vite locales y credenciales. En otros entornos definir `FRONTEND_ORIGINS` con orígenes explícitos.
-- `frontend/.env.example` apunta al Gateway local (`http://localhost:8080/api`). El `.env` privado existente no se modifica.
+- El API Gateway escucha en `8080` y enruta a Identity `8081`, Catalog `8082` y Social `8083`.
+- Las sesiones se representan con JWT firmados y se transportan en la cookie HttpOnly `rk_token` o como `Authorization: Bearer`.
+- El Gateway valida la firma y expiración del JWT, elimina cabeceras de identidad aportadas por el cliente y reinyecta `X-User-Id`, `X-Username` y `X-User-Role`.
+- Las rutas administrativas requieren el rol `admin` en el JWT.
+- Los registros públicos crean siempre rol `user`; el rol se lee desde Identity y no se acepta desde el navegador.
+- Los tres servicios HTTP tienen Spring Security con filtro de aplicación; Catalog y Social mantienen además el filtro de confianza del Gateway.
+- En producción, `RANKINGS_JWT_SECRET` e `INTERNAL_SERVICE_KEY` son obligatorios. Nunca usar secretos de desarrollo fuera de local.
 
-## Matriz de rutas del Gateway
+## Versionado
 
-| Ruta pública | Servicio destino | Estado real |
-|---|---|---|
-| `/api/auth/**` | Identity `8081` | Enrutamiento configurado; controladores pendientes |
-| `/api/users/me/saved` | Catalog `8082` | Implementado en Catalog; requiere identidad validada |
-| `/api/users/{username}/posts` | Social `8083` | Enrutamiento configurado; controladores pendientes |
-| `/api/users/**` | Identity `8081` | Enrutamiento configurado; controladores pendientes |
-| `/api/items/{itemId}/reviews` | Social `8083` | Enrutamiento configurado; controlador pendiente |
-| `/api/items/**` | Catalog `8082` | Lectura, hijos y guardados implementados parcialmente |
-| `/api/posts/**`, `/api/comments/**` | Social `8083` | Enrutamiento configurado; controladores pendientes |
+La API nueva usa el prefijo `/api/v1`. Se conservan las rutas `/api/**` originales por compatibilidad.
 
-## Importante: seguridad aún no terminada
+| Dominio | Ruta v1 |
+|---|---|
+| Identidad | `/api/v1/auth/**`, `/api/v1/users/**` |
+| Catálogo | `/api/v1/items/**`, `/api/v1/users/me/saved` |
+| Social | `/api/v1/posts/**`, `/api/v1/comments/**`, `/api/v1/admin/moderation/**`, `/api/v1/users/*/posts`, `/api/v1/items/*/reviews` |
 
-El Gateway todavía **no valida** la cookie `rk_token`, no crea una identidad autenticada ni inyecta `X-User-Id`. No se debe confiar en un `X-User-Id` recibido desde Internet. Los endpoints protegidos de Catalog responderán `401` hasta implementar la validación de sesión y el reenvío interno seguro. No se ha añadido un filtro que simule autenticación.
+## Documentación OpenAPI
 
-CORS no sustituye CSRF. Antes de producción hay que implementar protección CSRF para operaciones mutables, cookies `HttpOnly`/`Secure`/`SameSite`, límites de tasa, secretos externos y autorización por recurso.
+- Catalog: `http://localhost:8082/swagger-ui.html`
+- Identity: `http://localhost:8081/swagger-ui.html`
+- Social: `http://localhost:8083/swagger-ui.html`
+- Especificaciones fuente: `contracts/openapi/*.yaml`
 
-## Verificación de esta iteración
+## Verificación ejecutada
 
-- `tsc -b` del frontend: correcto tras tipar explícitamente los genéricos de `Tabs` en `ItemPage` y `Profile`.
-- El bundle Vite no se pudo verificar en este entorno: la instalación disponible carece del binding nativo Linux de Rolldown. Reinstalar dependencias en Linux con `npm ci` y ejecutar `npm run build`.
-- No se pudo ejecutar Maven aquí: el entorno tiene Java 21, mientras que los cuatro `pom.xml` conservan Java 25, y no hay una distribución Maven disponible localmente. No se rebajó la versión Java del proyecto para no alterar una decisión existente.
+- Identity: `mvnw test` — pruebas automatizadas aprobadas.
+- Catalog: `mvnw test` — 8 pruebas aprobadas.
+- Social: `mvnw test` — 36 pruebas aprobadas.
+- API Gateway: `mvnw test` — prueba de contexto aprobada.
+- Frontend: `npm run build` — build de producción aprobado.
+- Frontend: `npm run lint` — lint aprobado.
+
+## Pendiente operativo
+
+- Capturas reales de login, catálogo, creación de contenido y moderación.
+- Prueba E2E con los cuatro procesos activos.
+- Certificados y secretos de producción.

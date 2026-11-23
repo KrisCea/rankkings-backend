@@ -4,6 +4,7 @@ $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $env:SPRING_PROFILES_ACTIVE = "local"
 $env:INTERNAL_SERVICE_KEY = [Guid]::NewGuid().ToString("N")
+$env:RANKINGS_JWT_SECRET = "rankkings-local-development-secret-2026-32bytes"
 if ([string]::IsNullOrWhiteSpace($env:DEV_CAPTCHA_BYPASS)) {
   $env:DEV_CAPTCHA_BYPASS = "true"
 }

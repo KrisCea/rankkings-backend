@@ -7,6 +7,7 @@ import cl.rankkings.identity_service.model.Account;
 import cl.rankkings.identity_service.model.LoginSession;
 import cl.rankkings.identity_service.repository.AccountRepository;
 import cl.rankkings.identity_service.repository.SessionRepository;
+import cl.rankkings.identity_service.security.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,17 +25,20 @@ public class SessionService {
     private final SessionRepository sessions;
     private final boolean cookieSecure;
     private final String internalKey;
+    private final JwtService jwtService;
 
     public SessionService(
             AccountRepository accounts,
             SessionRepository sessions,
             @Value("${rankkings.cookie-secure:false}") boolean cookieSecure,
-            @Value("${rankkings.internal-key:}") String internalKey
+            @Value("${rankkings.internal-key:}") String internalKey,
+            JwtService jwtService
     ) {
         this.accounts = accounts;
         this.sessions = sessions;
         this.cookieSecure = cookieSecure;
         this.internalKey = internalKey;
+        this.jwtService = jwtService;
     }
 
     public Account findAccount(String cookie) {
@@ -57,7 +61,7 @@ public class SessionService {
     }
 
     public AuthenticatedUser create(Account account, User user) {
-        String rawToken = Credentials.randomToken();
+        String rawToken = jwtService.createToken(account);
         LoginSession session = new LoginSession();
         session.setTokenHash(Credentials.sha256(rawToken));
         session.setAccountId(account.getId());

@@ -25,6 +25,8 @@ spring:
     enabled: false
 rankkings:
   internal-key: ${INTERNAL_SERVICE_KEY:}
+  jwt-secret: ${RANKINGS_JWT_SECRET:rankkings-local-development-secret-2026-32bytes}
+  jwt-ttl-seconds: ${JWT_TTL_SECONDS:604800}
   cookie-secure: ${COOKIE_SECURE:false}
   turnstile-secret: ${TURNSTILE_SECRET:}
   dev-captcha-bypass: ${DEV_CAPTCHA_BYPASS:false}
@@ -61,3 +63,4 @@ spring:
     locations: classpath:db/migration
 rankkings:
   verify-url: ${VERIFICATION_URL:}
+  jwt-secret: ${RANKINGS_JWT_SECRET:}

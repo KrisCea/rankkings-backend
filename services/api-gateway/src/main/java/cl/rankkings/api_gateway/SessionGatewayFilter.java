@@ -1,5 +1,7 @@
 package cl.rankkings.api_gateway;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -17,10 +19,14 @@ import java.util.*;
 @Component
 public class SessionGatewayFilter implements GlobalFilter, Ordered {
     private final WebClient client=WebClient.create();
+    private final JwtGatewayService jwtGatewayService;
     @Value("${rankkings.identity-url:http://localhost:8081}") private String identityUrl;
     @Value("${rankkings.internal-key:}") private String internalKey;
     @Value("${rankkings.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") private String allowedOrigins;
     public record Principal(String id,String username,String displayName,String avatarUrl,String accountType,boolean isVerifiedBusiness,String role) {}
+    public SessionGatewayFilter(JwtGatewayService jwtGatewayService) {
+        this.jwtGatewayService = jwtGatewayService;
+    }
     @Override public int getOrder(){return -100;}
 
     @Override public Mono<Void> filter(ServerWebExchange exchange,GatewayFilterChain chain){
@@ -36,10 +42,49 @@ public class SessionGatewayFilter implements GlobalFilter, Ordered {
             exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
             return exchange.getResponse().setComplete();
         }
-        var cookie=clean.getCookies().getFirst("rk_token");
-        if(cookie==null || cookie.getValue().isBlank() || internalKey.isBlank())return chain.filter(next);
+        String token = clean.getHeaders().getFirst("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7).trim();
+        } else {
+            var cookie = clean.getCookies().getFirst("rk_token");
+            token = cookie == null ? null : cookie.getValue();
+        }
+        if (token == null || token.isBlank()) return chain.filter(next);
+
+        try {
+            Claims claims = jwtGatewayService.parse(token);
+            Principal principal = new Principal(
+                    claims.getSubject(),
+                    claims.get("username", String.class),
+                    null,
+                    null,
+                    null,
+                    false,
+                    claims.get("role", String.class)
+            );
+            ServerHttpRequest authenticated = clean.mutate().headers(h -> {
+                h.remove("Authorization");
+                h.set("X-User-Id", principal.id());
+                h.set("X-Username", principal.username());
+                if (principal.role() != null) h.set("X-User-Role", principal.role());
+            }).build();
+            ServerWebExchange authenticatedExchange = exchange.mutate().request(authenticated).build();
+            if (isAdminRoute(clean.getURI().getPath())
+                    && !"admin".equals(principal.role())) {
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                return exchange.getResponse().setComplete();
+            }
+            return chain.filter(authenticatedExchange);
+        } catch (JwtException ignored) {
+            // Compatibilidad temporal con sesiones opacas creadas antes de activar JWT.
+        }
+
+        if (internalKey.isBlank()) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
         return client.get().uri(identityUrl+"/internal/session")
-             .header("X-Internal-Key",internalKey).cookie("rk_token",cookie.getValue())
+             .header("X-Internal-Key",internalKey).cookie("rk_token",token)
              .retrieve().bodyToMono(Principal.class)
              .map(principal -> {
                  ServerHttpRequest authenticated=clean.mutate().headers(h->{
@@ -50,5 +95,9 @@ public class SessionGatewayFilter implements GlobalFilter, Ordered {
              })
              // Una sesión inválida se trata como visitante, sin reenviar identidad falsa.
              .onErrorResume(error->Mono.empty()).defaultIfEmpty(next).flatMap(chain::filter);
+    }
+
+    private boolean isAdminRoute(String path) {
+        return path.contains("/admin/");
     }
 }
