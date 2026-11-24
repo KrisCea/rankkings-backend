@@ -61,8 +61,8 @@ public class CatalogService {
                 .coverUrl(input.coverUrl() == null ? "" : input.coverUrl())
                 .identifiers(input.identifiers() == null ? Map.of() : input.identifiers())
                 .details(input.details() == null ? Map.of() : input.details())
-                .verificationStatus("unverified")
-                .moderationStatus("approved")
+                .verificationStatus(input.uploaderVerified() ? "verified" : "unverified")
+                .moderationStatus(input.uploaderVerified() ? "approved" : "pending")
                 .postId(input.postId())
                 .externalLinks(externalLinks)
                 .build();
@@ -85,6 +85,13 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public RankableItemDto getItemInternal(String itemId) {
         return toDto(findEntityOrThrow(itemId), false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankableItemDto> getItemsForModeration(String status) {
+        return itemRepository.findByModerationStatusOrderByCreatedAtDesc(status).stream()
+                .map(item -> toDto(item, false))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -219,14 +226,22 @@ public class CatalogService {
 
     @Transactional
     public void updateItemModerationStatus(String itemId, ItemModerationUpdateInput input) {
-        RankableItem item = findEntityOrThrow(itemId);
+        RankableItem item = itemRepository.findByIdForUpdate(itemId)
+                .orElseThrow(() -> new EntityNotFoundException("Obra no encontrada: " + itemId));
         if (!item.getPostId().equals(input.postId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La obra no pertenece a esta publicación");
         }
         if (!List.of("pending", "approved", "rejected").contains(input.status())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de moderación inválido");
         }
+        if (!"pending".equals(item.getModerationStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El Rankable Item ya fue moderado");
+        }
         item.setModerationStatus(input.status());
+        item.setVerificationStatus("approved".equals(input.status()) ? "verified" : "unverified");
+        item.setModeratedBy(input.moderatedBy());
+        item.setModeratedAt(input.moderatedAt());
+        item.setModerationReason(input.reason());
         itemRepository.save(item);
     }
 
@@ -268,6 +283,7 @@ public class CatalogService {
                 entity.getIdentifiers(),
                 entity.getDetails() == null ? Map.of() : entity.getDetails(),
                 entity.getVerificationStatus(),
+                entity.getModerationStatus(),
                 entity.getPostId(),
                 entity.getAverageRating(),
                 entity.getRatingsCount(),

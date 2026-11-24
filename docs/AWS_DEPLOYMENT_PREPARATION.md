@@ -102,9 +102,24 @@ Todas las claves pueden entregarse mediante variables de entorno de ECS o secret
 
 Cada servicio aplica sus migraciones Flyway al iniciar. Los archivos están en `src/main/resources/db/migration` de cada servicio.
 
+La verificación de cuentas agrega `V2__account_verification_requests.sql` en Identity; las decisiones de moderación de Rankable Items agregan `V3__record_item_moderation_decisions.sql` en Catalog. Despliega las versiones nuevas de ambos servicios para que Flyway aplique estos cambios aditivos. Los estados de contenido que ya estaban pendientes no se modifican.
+
 Antes del despliegue, comprobar que RDS permita conexiones desde ECS y que el usuario tenga permiso para crear tablas. Las migraciones iniciales crean el esquema completo para Identity, Catalog y Social.
 
 No se debe cambiar `ddl-auto=validate` ni ejecutar datos demo en producción.
+
+## Primer administrador
+
+Las cuentas nuevas reciben el rol `user`. Para habilitar la primera cuenta administradora, debe existir y tener el correo verificado; un operador con acceso autorizado a la base de datos ejecuta una sola vez, reemplazando el correo:
+
+```sql
+UPDATE accounts
+SET user_role = 'admin'
+WHERE lower(email) = lower('correo-registrado@example.com')
+  AND email_verified = true;
+```
+
+Confirma que se actualizó exactamente una fila. Después, esa persona inicia sesión normalmente y puede promover otras cuentas verificadas desde **Administrar admins**. La aplicación no expone una operación pública para asignar el primer rol.
 
 ## S3
 

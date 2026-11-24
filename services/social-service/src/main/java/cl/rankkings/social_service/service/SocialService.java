@@ -154,8 +154,10 @@ public class SocialService {
         if (creatingItem) {
             registerItemCompensation(postId);
         }
+        boolean uploaderVerified = creatingItem
+                && identityClient.getUser(authorId).path("isVerified").asBoolean(false);
         JsonNode item = creatingItem
-                ? catalogClient.createItem(input.rankableItem(), authorId, postId)
+                ? catalogClient.createItem(input.rankableItem(), authorId, postId, uploaderVerified)
                 : catalogClient.getItem(input.itemId(), null);
         String itemId = key(item, "id");
         if (itemId.isBlank()) {
@@ -273,8 +275,20 @@ public class SocialService {
         review.setKind("review");
         review.setText(text);
         review.setAuthorScore(input.authorScore());
-        review.setModerationStatus("pending");
+        review.setModerationStatus("approved");
         comments.save(review);
+        if (input.authorScore() != null) {
+            PostRating rating = ratings.findByPostIdAndUserId(postId, authorId).orElseGet(() -> {
+                PostRating created = new PostRating();
+                created.setId(UUID.randomUUID().toString());
+                created.setPostId(postId);
+                created.setUserId(authorId);
+                return created;
+            });
+            rating.setScore(input.authorScore());
+            ratings.saveAndFlush(rating);
+            syncCatalogRatings(post);
+        }
         return presentComment(review, viewerId);
     }
 
@@ -376,7 +390,7 @@ public class SocialService {
         comment.setParentId(input.parentId());
         comment.setReplyToUsername(input.replyToUsername());
         comment.setText(text);
-        comment.setModerationStatus("pending");
+        comment.setModerationStatus("approved");
         comments.save(comment);
         return presentComment(comment, viewerId);
     }
@@ -509,7 +523,7 @@ public class SocialService {
                 "displayName", key(author, "displayName"),
                 "avatarUrl", key(author, "avatarUrl"),
                 "accountType", key(author, "accountType"),
-                "isVerifiedBusiness", author.path("isVerifiedBusiness").asBoolean(false)
+                "isVerified", author.path("isVerified").asBoolean(false)
         );
     }
 

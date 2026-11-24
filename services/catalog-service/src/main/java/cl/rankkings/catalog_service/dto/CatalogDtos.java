@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,7 @@ public class CatalogDtos {
             Map<String, String> identifiers,
             Map<String, String> details,
             String verificationStatus,
+            String moderationStatus,
             String postId,
             double averageRating,
             int ratingsCount,
@@ -54,6 +56,7 @@ public class CatalogDtos {
             Map<String, String> details,
             List<@Valid ExternalLinkInput> externalLinks,
             @NotBlank String uploadedBy,
+            boolean uploaderVerified,
             @NotBlank String postId
     ) {}
 
@@ -83,6 +86,9 @@ public class CatalogDtos {
 
     public record ItemModerationUpdateInput(
             @NotBlank String postId,
-            @NotBlank String status
+            @NotBlank String status,
+            @NotBlank String moderatedBy,
+            @NotNull Instant moderatedAt,
+            String reason
     ) {}
 }

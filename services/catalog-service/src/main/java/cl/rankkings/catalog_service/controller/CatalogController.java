@@ -64,6 +64,17 @@ public class CatalogController {
         return ResponseEntity.ok(catalogService.getItemInternal(itemId));
     }
 
+    @GetMapping("/internal/items")
+    public ResponseEntity<List<RankableItemDto>> getItemsForModeration(
+            @RequestParam String status,
+            @RequestHeader(value = "X-Internal-Key", required = false) String key) {
+        requireInternal(key);
+        if (!List.of("pending", "approved", "rejected").contains(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de moderación inválido");
+        }
+        return ResponseEntity.ok(catalogService.getItemsForModeration(status));
+    }
+
     @PutMapping("/items/{itemId}/save")
     public ResponseEntity<RankableItemDto> saveItem(
             @PathVariable String itemId,

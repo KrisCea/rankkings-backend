@@ -219,8 +219,11 @@ components:
       type: string
       enum: [verified, partial, unverified]
       description: >-
-        Estado de verificación de la obra. unverified significa que la
-        verificación está pendiente y no impide publicar ni consultar la obra.
+        Estado de verificación de los datos de la obra. La cuenta verificada del
+        autor permite aprobar y verificar automáticamente nuevas obras.
+    ModerationStatus:
+      type: string
+      enum: [approved, pending, rejected]
     Creator:
       type: object
       additionalProperties: false
@@ -255,7 +258,7 @@ components:
     CreateRankableItemInput:
       type: object
       additionalProperties: false
-      required: [category, title, creator, uploadedBy, postId]
+      required: [category, title, creator, uploadedBy, uploaderVerified, postId]
       properties:
         category:
           $ref: "#/components/schemas/CategoryId"
@@ -270,6 +273,9 @@ components:
           $ref: "#/components/schemas/CreatorInput"
         uploadedBy:
           type: string
+        uploaderVerified:
+          type: boolean
+          description: Señal interna de identidad del autor, determinada por el servicio Social.
         year:
           type: integer
         coverUrl:
@@ -344,6 +350,7 @@ components:
         - identifiers
         - details
         - verificationStatus
+        - moderationStatus
         - postId
         - averageRating
         - ratingsCount
@@ -380,6 +387,8 @@ components:
             type: string
         verificationStatus:
           $ref: "#/components/schemas/VerificationStatus"
+        moderationStatus:
+          $ref: "#/components/schemas/ModerationStatus"
         postId:
           type: string
         averageRating:

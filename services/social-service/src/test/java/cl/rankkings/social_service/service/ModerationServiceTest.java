@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
@@ -90,6 +91,45 @@ class ModerationServiceTest {
         Map<?, ?> second = (Map<?, ?>) ((List<?>) secondPage.get("items")).get(0);
         assertEquals("post-old", second.get("id"));
         assertEquals(false, ((Map<?, ?>) secondPage.get("page")).get("hasMore"));
+    }
+
+    @Test
+    void queuesAndApprovesPendingRankableItems() throws Exception {
+        identityServiceUser("admin-1", "{\"role\":\"admin\",\"username\":\"moderator\"}");
+        identityServiceUser("author-1", "{\"username\":\"author\"}");
+        JsonNode pendingItem = mapper.readTree("""
+                {
+                  "id":"item-1",
+                  "title":"Community Album",
+                  "category":"music",
+                  "description":"An independent release",
+                  "coverUrl":null,
+                  "postId":"post-1",
+                  "moderationStatus":"pending",
+                  "createdAt":"2026-01-03T00:00:00Z",
+                  "uploadedBy":"author-1"
+                }
+                """);
+        when(catalogClient.getModerationItems("pending")).thenReturn(List.of(pendingItem));
+
+        Map<String, Object> page = moderationService.queue("pending", "item", 25, null, "admin-1");
+
+        Map<?, ?> entry = (Map<?, ?>) ((List<?>) page.get("items")).getFirst();
+        assertEquals("item", entry.get("type"));
+        assertEquals("item-1", entry.get("id"));
+        assertEquals("author", ((Map<?, ?>) entry.get("author")).get("username"));
+
+        when(catalogClient.getItem("item-1", null)).thenReturn(pendingItem);
+        Map<String, Object> decision = moderationService.decide("item", "item-1", true, null, "admin-1");
+
+        assertEquals("approved", decision.get("status"));
+        verify(catalogClient).updateItemModerationStatus(
+                org.mockito.ArgumentMatchers.eq("item-1"),
+                org.mockito.ArgumentMatchers.eq("post-1"),
+                org.mockito.ArgumentMatchers.eq("approved"),
+                org.mockito.ArgumentMatchers.eq("admin-1"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(Instant.class));
     }
 
     @Test

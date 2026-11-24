@@ -115,8 +115,12 @@ public class PostMediaService {
                 attachment.getContentType()
         ));
         attachment.setStatus(READY);
-        attachment.setModerationStatus("pending");
+        attachment.setModerationStatus("approved");
         media.save(attachment);
+        if (Boolean.TRUE.equals(attachment.getCover())) {
+            activateCover(post, attachment);
+            syncItemCover(post, attachment);
+        }
         return Map.of("mediaId", mediaId, "status", READY);
     }
 
@@ -135,7 +139,7 @@ public class PostMediaService {
         attachment.setMediaType(input.type());
         attachment.setExternalUrl(PostMediaPolicy.normalizeExternalUrl(input.url()));
         attachment.setStatus(READY);
-        attachment.setModerationStatus("pending");
+        attachment.setModerationStatus("approved");
         media.save(attachment);
         return Map.of("mediaId", attachment.getId(), "status", READY);
     }
@@ -261,13 +265,7 @@ public class PostMediaService {
         if ("approved".equals(moderationStatus) && Boolean.TRUE.equals(attachment.getCover())) {
             SocialPost post = posts.findById(attachment.getPostId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publicación no encontrada"));
-            media.findByPostIdAndCoverTrue(post.getId()).stream()
-                    .filter(existing -> !existing.getId().equals(mediaId)
-                            && "approved".equals(existing.getModerationStatus()))
-                    .forEach(existing -> {
-                        existing.setCover(false);
-                        media.save(existing);
-                    });
+            activateCover(post, attachment);
             if ("approved".equals(post.getModerationStatus())) {
                 syncItemCover(post, attachment);
             }
@@ -406,6 +404,16 @@ public class PostMediaService {
                 UriUtils.encodePathSegment(attachment.getId(), StandardCharsets.UTF_8)
         );
         syncItemCover(post, coverUrl);
+    }
+
+    private void activateCover(SocialPost post, PostMedia attachment) {
+        media.findByPostIdAndCoverTrue(post.getId()).stream()
+                .filter(existing -> !existing.getId().equals(attachment.getId())
+                        && "approved".equals(existing.getModerationStatus()))
+                .forEach(existing -> {
+                    existing.setCover(false);
+                    media.save(existing);
+                });
     }
 
     private void syncItemCover(SocialPost post, String coverUrl) {

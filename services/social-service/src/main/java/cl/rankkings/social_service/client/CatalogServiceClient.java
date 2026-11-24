@@ -14,9 +14,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 
 @Component
 public class CatalogServiceClient {
@@ -41,9 +43,35 @@ public class CatalogServiceClient {
         return get(request.build());
     }
 
-    public void updateItemModerationStatus(String itemId, String postId, String status) {
+    public List<JsonNode> getModerationItems(String status) {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(
+                        catalogUrl + "/internal/items?status=" + encode(status)))
+                .timeout(Duration.ofSeconds(3))
+                .header("X-Internal-Key", internalKey)
+                .GET()
+                .build();
+        JsonNode response = get(request);
+        java.util.ArrayList<JsonNode> items = new java.util.ArrayList<>();
+        response.forEach(items::add);
+        return List.copyOf(items);
+    }
+
+    public void updateItemModerationStatus(
+            String itemId,
+            String postId,
+            String status,
+            String moderatorId,
+            String reason,
+            Instant moderatedAt
+    ) {
         try {
-            String body = mapper.writeValueAsString(Map.of("postId", postId, "status", status));
+            Map<String, Object> input = new LinkedHashMap<>();
+            input.put("postId", postId);
+            input.put("status", status);
+            input.put("moderatedBy", moderatorId);
+            input.put("reason", reason);
+            input.put("moderatedAt", moderatedAt.toString());
+            String body = mapper.writeValueAsString(input);
             HttpRequest request = HttpRequest.newBuilder(URI.create(
                             catalogUrl + "/internal/items/" + encode(itemId) + "/moderation"))
                     .timeout(Duration.ofSeconds(3))
@@ -52,6 +80,12 @@ public class CatalogServiceClient {
                     .PUT(HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            if (response.statusCode() == 409) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "El Rankable Item ya fue moderado");
+            }
+            if (response.statusCode() == 404) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Rankable Item no encontrado");
+            }
             if (response.statusCode() != 204) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo actualizar la moderación del catálogo");
             }
@@ -65,13 +99,14 @@ public class CatalogServiceClient {
         }
     }
 
-    public JsonNode createItem(NewRankableItemInput input, String authorId, String postId) {
+    public JsonNode createItem(NewRankableItemInput input, String authorId, String postId, boolean uploaderVerified) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("category", input.category());
         body.put("title", input.title());
         body.put("description", input.description());
         body.put("creator", input.creatorInput());
         body.put("uploadedBy", authorId);
+        body.put("uploaderVerified", uploaderVerified);
         body.put("year", input.year());
         body.put("coverUrl", input.coverUrl());
         body.put("identifiers", input.identifiers());

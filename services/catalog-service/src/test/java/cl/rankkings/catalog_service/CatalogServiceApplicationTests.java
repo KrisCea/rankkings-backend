@@ -2,6 +2,7 @@ package cl.rankkings.catalog_service;
 
 import cl.rankkings.catalog_service.dto.CatalogDtos.CreateRankableItemInput;
 import cl.rankkings.catalog_service.dto.CatalogDtos.CreatorInput;
+import cl.rankkings.catalog_service.dto.CatalogDtos.ItemModerationUpdateInput;
 import cl.rankkings.catalog_service.repository.ItemRepository;
 import cl.rankkings.catalog_service.service.CatalogService;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,7 @@ class CatalogServiceApplicationTests {
 				Map.of("format", "novel"),
 				null,
 				"user-1",
+				false,
 				"post-1"
 		));
 
@@ -69,7 +71,7 @@ class CatalogServiceApplicationTests {
 		Assertions.assertEquals(Map.of("format", "novel"), item.details());
 		Assertions.assertEquals(java.util.List.of(), item.externalLinks());
 		Assertions.assertEquals("unverified", item.verificationStatus());
-		Assertions.assertEquals("approved", itemRepository.findById(item.id()).orElseThrow().getModerationStatus());
+		Assertions.assertEquals("pending", itemRepository.findById(item.id()).orElseThrow().getModerationStatus());
 	}
 
 	@Test
@@ -85,6 +87,7 @@ class CatalogServiceApplicationTests {
 				Map.of("venue", "Arena", "city", "Santiago"),
 				null,
 				"user-1",
+				false,
 				"post-1"
 		);
 
@@ -108,10 +111,40 @@ class CatalogServiceApplicationTests {
 				null,
 				null,
 				"user-1",
+				true,
 				"post-2"
 		));
 
 		Assertions.assertEquals(Map.of(), item.details());
+		Assertions.assertEquals("verified", item.verificationStatus());
+		Assertions.assertEquals("approved", item.moderationStatus());
+	}
+
+	@Test
+	@Transactional
+	void approvingPendingItemAlsoMarksItsContentVerified() {
+		var item = catalogService.createItem(new CreateRankableItemInput(
+				"music",
+				"Community track",
+				null,
+				new CreatorInput(null, "Artist", null, null, null),
+				null,
+				null,
+				Map.of(),
+				Map.of(),
+				null,
+				"user-2",
+				false,
+				"post-pending"
+		));
+
+		catalogService.updateItemModerationStatus(
+				item.id(), new ItemModerationUpdateInput(
+						"post-pending", "approved", "admin-1", java.time.Instant.now(), null));
+
+		var approved = itemRepository.findById(item.id()).orElseThrow();
+		Assertions.assertEquals("approved", approved.getModerationStatus());
+		Assertions.assertEquals("verified", approved.getVerificationStatus());
 	}
 
 	@Test
@@ -129,6 +162,7 @@ class CatalogServiceApplicationTests {
 				Map.of(),
 				null,
 				"user-1",
+				false,
 				"post-long-cover-url"
 		));
 
@@ -149,6 +183,7 @@ class CatalogServiceApplicationTests {
 				Map.of(),
 				null,
 				"user-1",
+				false,
 				"post-to-compensate"
 		));
 

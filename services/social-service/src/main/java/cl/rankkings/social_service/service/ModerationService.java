@@ -30,7 +30,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class ModerationService {
-    private static final List<String> TYPES = List.of("post", "review", "comment", "media");
+    private static final List<String> TYPES = List.of("item", "post", "review", "comment", "media");
     private static final List<String> STATUSES = List.of("pending", "approved", "rejected");
 
     private final PostRepository posts;
@@ -58,6 +58,9 @@ public class ModerationService {
             posts.findByModerationStatusOrderByCreatedAtDesc(status).stream()
                     .filter(post -> "item".equals(post.getKind()))
                     .forEach(post -> entries.add(postEntry(post)));
+        }
+        if ("all".equals(type) || "item".equals(type)) {
+            catalogClient.getModerationItems(status).forEach(item -> entries.add(itemEntry(item)));
         }
         if ("all".equals(type) || "review".equals(type)) {
             comments.findByKindAndModerationStatusAndDeletedAtIsNullOrderByCreatedAtDesc("review", status)
@@ -113,6 +116,7 @@ public class ModerationService {
         Instant moderatedAt = Instant.now();
 
         switch (type) {
+            case "item" -> moderateItem(id, moderatorId, status, decisionReason, moderatedAt);
             case "post" -> moderatePost(id, moderatorId, status, decisionReason, moderatedAt);
             case "review" -> moderateComment(id, "review", moderatorId, status, decisionReason, moderatedAt);
             case "comment" -> moderateComment(id, "comment", moderatorId, status, decisionReason, moderatedAt);
@@ -134,13 +138,25 @@ public class ModerationService {
 
         if ("item".equals(post.getKind())) {
             JsonNode item = catalogClient.getItem(post.getItemId(), null);
-            if (post.getId().equals(item.path("postId").asString(null))) {
-                catalogClient.updateItemModerationStatus(post.getItemId(), post.getId(), status);
+            if (post.getId().equals(item.path("postId").asString(null))
+                    && "pending".equals(item.path("moderationStatus").asString(""))) {
+                catalogClient.updateItemModerationStatus(
+                        post.getItemId(), post.getId(), status, moderatorId, reason, moderatedAt);
             }
         }
         if ("approved".equals(status)) {
             postMediaService.syncApprovedCoverForPost(post);
         }
+    }
+
+    private void moderateItem(String id, String moderatorId, String status, String reason, Instant moderatedAt) {
+        JsonNode item = catalogClient.getItem(id, null);
+        requirePending(item.path("moderationStatus").asString(""));
+        String postId = item.path("postId").asString("");
+        if (postId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El Rankable Item no tiene una publicación asociada");
+        }
+        catalogClient.updateItemModerationStatus(id, postId, status, moderatorId, reason, moderatedAt);
     }
 
     private void moderateComment(
@@ -199,6 +215,23 @@ public class ModerationService {
         itemInfo.put("coverUrl", item.path("coverUrl").asString(null));
         content.put("item", itemInfo);
         return entry(post.getId(), "post", post.getCreatedAt(), post.getModerationStatus(), post.getAuthorId(), content);
+    }
+
+    private Entry itemEntry(JsonNode item) {
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("title", item.path("title").asString(""));
+        content.put("category", item.path("category").asString(""));
+        content.put("description", item.path("description").asString(""));
+        content.put("coverUrl", item.path("coverUrl").asString(null));
+        content.put("postId", item.path("postId").asString(""));
+        return entry(
+                item.path("id").asString(""),
+                "item",
+                Instant.parse(item.path("createdAt").asString()),
+                item.path("moderationStatus").asString(""),
+                item.path("uploadedBy").asString(""),
+                content
+        );
     }
 
     private Entry reviewEntry(PostComment comment) {

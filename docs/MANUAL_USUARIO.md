@@ -4,7 +4,7 @@
 
 1. Abra `http://localhost:5173`.
 2. Seleccione **Iniciar sesión**.
-3. Ingrese correo y contraseña de una cuenta verificada.
+3. Ingrese correo y contraseña de una cuenta con el correo confirmado.
 4. Use **Cerrar sesión** para finalizar la sesión.
 
 ## Registro y verificación
@@ -39,7 +39,13 @@ Los usuarios autenticados pueden votar, puntuar, compartir, comentar y dar like 
 
 ## Moderación
 
-Las cuentas con rol `admin` pueden ingresar al panel de moderación y aprobar o rechazar publicaciones y reseñas pendientes.
+Confirmar el correo no otorga la insignia de cuenta verificada. Desde **Verificación de cuenta**, cualquier cuenta personal o de empresa puede solicitarla con un enlace HTTPS y una explicación. Un administrador revisa la solicitud y puede aprobarla o rechazarla con un motivo; una solicitud rechazada se puede volver a enviar.
+
+Solo los Rankable Items nuevos de cuentas sin insignia quedan pendientes para revisión. Si la cuenta del autor está verificada, el Rankable Item se aprueba y verifica automáticamente. Las reseñas, comentarios y adjuntos nuevos se publican sin aprobación previa. Los registros que ya estaban pendientes antes de este cambio conservan su estado.
+
+Las cuentas con rol `admin` pueden abrir **Moderación** desde el menú del perfil para revisar Rankable Items y los registros antiguos que ya estuvieran pendientes.
+
+Para dar el rol `admin` a otra cuenta, abre **Gestión de usuarios** desde el mismo menú e ingresa el correo de una cuenta registrada y con el correo confirmado. La cuenta promovida debe iniciar sesión o recargar la aplicación para ver las opciones de administración.
 
 ## Solución de problemas
 

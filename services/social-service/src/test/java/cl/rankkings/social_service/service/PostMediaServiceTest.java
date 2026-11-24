@@ -65,7 +65,7 @@ class PostMediaServiceTest {
     }
 
     @Test
-    void keepsNewCoverPendingUntilModerationApprovesIt() {
+    void makesNewCoverAvailableImmediatelyAfterUpload() throws Exception {
         SocialPost post = new SocialPost();
         post.setId("post-1");
         post.setItemId("item-1");
@@ -87,16 +87,17 @@ class PostMediaServiceTest {
         when(storage.hasValidImageSignature("pending-post-media/media-1", "image/png")).thenReturn(true);
         when(storage.finalizeUpload("pending-post-media/media-1", "media-1", "image/png"))
                 .thenReturn("post-media/media-1");
+        when(media.findByPostIdAndCoverTrue("post-1")).thenReturn(List.of());
+        when(catalogClient.getItem("item-1", null)).thenReturn(new ObjectMapper().readTree(
+                "{\"postId\":\"post-1\"}"));
 
         postMediaService.confirmImageUpload("post-1", "media-1", "user-1");
 
-        verify(catalogClient, never()).updateItemCover(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString());
+        verify(catalogClient).updateItemCover(
+                "item-1", "post-1", "/api/posts/post-1/media/media-1/content");
         assertTrue("ready".equals(attachment.getStatus()));
         assertTrue(attachment.getCover());
-        assertTrue("pending".equals(attachment.getModerationStatus()));
+        assertTrue("approved".equals(attachment.getModerationStatus()));
     }
 
     @Test

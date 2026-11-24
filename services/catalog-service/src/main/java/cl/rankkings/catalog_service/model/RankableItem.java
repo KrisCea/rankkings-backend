@@ -71,6 +71,12 @@ public class RankableItem {
     @Builder.Default
     private String moderationStatus = "approved";
 
+    private Instant moderatedAt;
+    private String moderatedBy;
+
+    @Column(columnDefinition = "TEXT")
+    private String moderationReason;
+
     @Column(nullable = false)
     private String postId;
 

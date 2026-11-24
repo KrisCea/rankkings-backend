@@ -195,6 +195,155 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/ServerError"
+  /admin/users/promote:
+    post:
+      tags: [Users]
+      operationId: promoteUserToAdmin
+      summary: Promover una cuenta verificada a administradora
+      description: Solo una cuenta administradora puede asignar este rol a una cuenta registrada con correo verificado.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromoteAdminInput"
+      responses:
+        "200":
+          description: Rol de administrador asignado o ya existente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAssignment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /users/me/verification-request:
+    post:
+      tags: [Users]
+      operationId: requestAccountVerification
+      summary: Solicitar la insignia de cuenta verificada
+      description: La verificación del correo es independiente. La solicitud requiere una URL HTTPS y una explicación; una cuenta rechazada puede volver a solicitarla.
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationRequestInput"
+      responses:
+        "200":
+          description: Solicitud registrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /admin/users/verification-requests:
+    get:
+      tags: [Users]
+      operationId: getPendingVerificationRequests
+      summary: Listar solicitudes de verificación pendientes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Solicitudes pendientes ordenadas por fecha.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminVerificationRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/users/{userId}/verification/approve:
+    post:
+      tags: [Users]
+      operationId: approveAccountVerification
+      summary: Aprobar una solicitud de verificación
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cuenta verificada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationDecision"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /admin/users/{userId}/verification/reject:
+    post:
+      tags: [Users]
+      operationId: rejectAccountVerification
+      summary: Rechazar una solicitud de verificación
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationRejectionInput"
+      responses:
+        "200":
+          description: Solicitud rechazada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationDecision"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /users/me/share-contacts:
     get:
       tags: [Users]
@@ -372,6 +521,14 @@ components:
           type: string
           minLength: 1
           writeOnly: true
+    PromoteAdminInput:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
     RegisterResult:
       type: object
       additionalProperties: false
@@ -386,10 +543,79 @@ components:
     UserRole:
       type: string
       enum: [user, admin]
+    AdminAssignment:
+      type: object
+      additionalProperties: false
+      required: [username, role, changed]
+      properties:
+        username:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        changed:
+          type: boolean
+    AccountVerificationStatus:
+      type: string
+      enum: [unverified, pending, verified, rejected]
+    VerificationRequestInput:
+      type: object
+      additionalProperties: false
+      required: [profileLink, explanation]
+      properties:
+        profileLink:
+          type: string
+          format: uri
+          pattern: "^https://"
+          maxLength: 2048
+        explanation:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    VerificationRejectionInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    VerificationDecision:
+      type: object
+      additionalProperties: false
+      required: [id, username, status]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        status:
+          $ref: "#/components/schemas/AccountVerificationStatus"
+    AdminVerificationRequest:
+      type: object
+      additionalProperties: false
+      required: [id, username, displayName, accountType, profileLink, explanation, requestedAt]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        accountType:
+          $ref: "#/components/schemas/AccountType"
+        profileLink:
+          type: string
+          format: uri
+        explanation:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
     UserSummary:
       type: object
       additionalProperties: false
-      required: [id, username, displayName, avatarUrl, accountType]
+      required: [id, username, displayName, avatarUrl, accountType, isVerified]
       properties:
         id:
           type: string
@@ -402,7 +628,7 @@ components:
           format: uri
         accountType:
           $ref: "#/components/schemas/AccountType"
-        isVerifiedBusiness:
+        isVerified:
           type: boolean
     User:
       type: object
@@ -415,6 +641,9 @@ components:
         - accountType
         - isAuthenticated
         - role
+        - isVerified
+        - verificationStatus
+        - verificationReviewReason
       properties:
         id:
           type: string
@@ -427,13 +656,17 @@ components:
           format: uri
         accountType:
           $ref: "#/components/schemas/AccountType"
-        isVerifiedBusiness:
+        isVerified:
           type: boolean
         isAuthenticated:
           type: boolean
           const: true
         role:
           $ref: "#/components/schemas/UserRole"
+        verificationStatus:
+          $ref: "#/components/schemas/AccountVerificationStatus"
+        verificationReviewReason:
+          type: [string, "null"]
     UserProfile:
       type: object
       additionalProperties: false
@@ -443,6 +676,7 @@ components:
         - displayName
         - avatarUrl
         - accountType
+        - isVerified
         - followersCount
         - followingCount
         - postsCount
@@ -459,7 +693,7 @@ components:
           format: uri
         accountType:
           $ref: "#/components/schemas/AccountType"
-        isVerifiedBusiness:
+        isVerified:
           type: boolean
         bio:
           type: string

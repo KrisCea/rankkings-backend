@@ -23,7 +23,7 @@ public class SessionGatewayFilter implements GlobalFilter, Ordered {
     private final String identityUrl;
     private final String internalKey;
     private final String allowedOrigins;
-    public record Principal(String id,String username,String displayName,String avatarUrl,String accountType,boolean isVerifiedBusiness,String role) {}
+    public record Principal(String id,String username,String displayName,String avatarUrl,String accountType,boolean isVerified,String role) {}
     @Autowired
     public SessionGatewayFilter(
             @Value("${rankkings.identity-url:http://localhost:8081}") String identityUrl,

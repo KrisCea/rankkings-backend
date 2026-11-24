@@ -31,7 +31,7 @@ class SessionGatewayFilterTest {
               "displayName": "Sample User",
               "avatarUrl": null,
               "accountType": "user",
-              "isVerifiedBusiness": false,
+              "isVerified": false,
               "role": "user"
             }
             """;

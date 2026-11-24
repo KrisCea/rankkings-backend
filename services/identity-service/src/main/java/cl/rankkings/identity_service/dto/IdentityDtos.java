@@ -19,16 +19,27 @@ public final class IdentityDtos {
     public record LoginInput(@NotBlank @Email String email, @NotBlank String password) {}
     public record TokenInput(@NotBlank String token) {}
     public record EmailInput(@NotBlank @Email String email) {}
-    public record UserSummary(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerifiedBusiness) {}
-    public record User(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerifiedBusiness, boolean isAuthenticated, String role) {}
-    public record Profile(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerifiedBusiness, String bio, long followersCount, long followingCount, long postsCount, boolean isFollowedByCurrentUser) {}
+    public record VerificationRequestInput(
+            @NotBlank @Size(max = 2048) String profileLink,
+            @NotBlank @Size(max = 1000) String explanation
+    ) {}
+    public record VerificationRejectionInput(@NotBlank @Size(max = 1000) String reason) {}
+    public record AdminAssignment(String username, String role, boolean changed) {}
+    public record AdminVerificationRequest(
+            String id, String username, String displayName, String accountType,
+            String profileLink, String explanation, String requestedAt
+    ) {}
+    public record VerificationDecision(String id, String username, String status) {}
+    public record UserSummary(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerified) {}
+    public record User(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerified, boolean isAuthenticated, String role, String verificationStatus, String verificationReviewReason) {}
+    public record Profile(String id, String username, String displayName, String avatarUrl, String accountType, boolean isVerified, String bio, long followersCount, long followingCount, long postsCount, boolean isFollowedByCurrentUser) {}
     public record Principal(
             String id,
             String username,
             String displayName,
             String avatarUrl,
             String accountType,
-            boolean isVerifiedBusiness,
+            boolean isVerified,
             String role
     ) {}
     public record AuthenticatedUser(String token, User user) {}

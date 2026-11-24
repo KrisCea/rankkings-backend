@@ -100,9 +100,11 @@ public class AuthService {
                 account.getDisplayName(),
                 avatar(account),
                 account.getAccountType(),
-                false,
+                "verified".equals(account.getVerificationStatus()),
                 true,
-                account.getRole()
+                account.getRole(),
+                account.getVerificationStatus(),
+                account.getVerificationReviewReason()
         );
     }
 

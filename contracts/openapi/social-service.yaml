@@ -648,7 +648,7 @@ paths:
       tags: [Moderation]
       operationId: getModerationQueue
       summary: Listar contenido pendiente de moderación
-      description: Solo disponible para usuarios autenticados con role=admin. El cursor es opaco y la cola combina posts, reseñas, comentarios y adjuntos.
+      description: Solo disponible para usuarios autenticados con role=admin. La cola incluye Rankable Items pendientes y registros antiguos que ya estaban pendientes.
       security:
         - SessionCookie: []
         - BearerAuth: []
@@ -662,7 +662,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [all, post, review, comment, media]
+            enum: [all, item, post, review, comment, media]
           default: all
         - name: limit
           in: query
@@ -843,9 +843,10 @@ components:
           type: string
     ModerationContentType:
       type: string
-      enum: [post, review, comment, media]
+      enum: [item, post, review, comment, media]
     ModerationQueueItem:
       oneOf:
+        - $ref: "#/components/schemas/ModerationItem"
         - $ref: "#/components/schemas/ModerationPost"
         - $ref: "#/components/schemas/ModerationReview"
         - $ref: "#/components/schemas/ModerationComment"
@@ -853,6 +854,7 @@ components:
       discriminator:
         propertyName: type
         mapping:
+          item: "#/components/schemas/ModerationItem"
           post: "#/components/schemas/ModerationPost"
           review: "#/components/schemas/ModerationReview"
           comment: "#/components/schemas/ModerationComment"
@@ -874,6 +876,27 @@ components:
           $ref: "#/components/schemas/ModerationAuthor"
         content:
           type: object
+    ModerationItem:
+      allOf:
+        - $ref: "#/components/schemas/ModerationEntry"
+        - type: object
+          properties:
+            type:
+              const: item
+            content:
+              type: object
+              required: [title, category, description, coverUrl, postId]
+              properties:
+                title:
+                  type: string
+                category:
+                  type: string
+                description:
+                  type: string
+                coverUrl:
+                  type: [string, "null"]
+                postId:
+                  type: string
     ModerationPost:
       allOf:
         - $ref: "#/components/schemas/ModerationEntry"
@@ -1024,7 +1047,7 @@ components:
         accountType:
           type: string
           enum: [individual, business]
-        isVerifiedBusiness:
+        isVerified:
           type: boolean
     Creator:
       type: object
